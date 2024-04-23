@@ -1,33 +1,69 @@
-# Project
+# SymCrypt Provider for Rustls
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+This crate provides integration for using [rust-symcrypt](https://github.com/microsoft/rust-symcrypt) cryptographic functionalities with  [rustls](https://github.com/rustls/rustls), by implementing the required traits specified by `rustls`.
 
-As the maintainer of this project, please make a few updates:
+## Status and Platform Support:
+- Currently works with: `rustls = { version = "0.23.0", features = ["ring", "tls12", "std"], default-features = false }`
+- Windows AMD64: Full support.
+- Azure Linux: Full support.
+- Ubuntu: Partial support. While tested, full compatibility and optimal performance on all Ubuntu environments cannot be guaranteed.
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+## Dependencies
 
-## Contributing
+This crate depends on the [symcrypt](https://github.com/microsoft/rust-symcrypt) crate and requires you have the necessary `symcrypt` binaries for your architecture.
+Refer to the [rust-symcrypt Quick Start Guide](https://github.com/microsoft/rust-symcrypt/tree/main/rust-symcrypt#quick-start-guide) to download the required binaries.
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
+## Usage
 
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
+Add `rustls-symcrypt` to your `Cargo.toml`:
+**Note:** If you wish to enable `x25519` or `chacha` you may add it as a feature at this time.
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+```toml
+[dependencies]
+rustls = { version = "0.23.0", features = ["ring", "tls12", "std"], default-features = false }
+# Disabling aws-lc as it slows down build times and is not needed.
+rustls_symcrypt = "0.1.0"
+# To enable the chacha feature:
+# rustls_symcrypt = {version = "0.1.0", features = ["chacha"]}
+```
 
-## Trademarks
+## Supported Ciphers
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
-trademarks or logos is subject to and must follow 
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+Supported cipher suites are listed below, ordered by preference. IE: The default configuration prioritizes `TLS13_AES_256_GCM_SHA384` over `TLS13_AES_128_GCM_SHA256`.
+
+### TLS 1.3
+
+```ignore
+TLS13_AES_256_GCM_SHA384
+TLS13_AES_128_GCM_SHA256
+TLS13_CHACHA20_POLY1305_SHA256 // Enabled with the `chacha` feature
+```
+
+**Note:** `TLS13_CHACHA20_POLY1305_SHA256` is disabled by default. Enable the `chacha` feature in your `Cargo.toml` to use this cipher suite.
+
+### TLS 1.2
+
+```ignore
+TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 // Enabled with the `chacha` feature
+TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 // Enabled with the `chacha` feature
+```
+
+## Supported Key Exchanges
+
+Key exchanges are listed below, ordered by preference. IE: `SECP384R1` is preferred over `SECP256R1`.
+
+```ignore
+SECP384R1
+SECP256R1
+X25519 // Enabled with the `x25519` feature
+```
+
+**Note:** `X25519` is disabled by default. To enable, add `x25519` feature in your `Cargo.toml`.
+
+## Example Code
+
+The `examples` directory showcases how to use the `rustls-symcrypt` provider with `rustls` for both a client configuration and a server configuration by taking advantage of `rustls::ClientConfig::builder_with_provider()`.
