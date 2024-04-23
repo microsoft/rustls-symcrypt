@@ -5,6 +5,9 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0 OR ISC OR MIT"
 description = "Implementation of rustls crypto provider model for SymCrypt"
+homepage = "https://github.com/microsoft/SymCrypt"
+repository = "https://github.com/microsoft/rustls-symcrypt"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
