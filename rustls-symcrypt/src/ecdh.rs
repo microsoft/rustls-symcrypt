@@ -2,8 +2,7 @@
 use rustls::crypto::{ActiveKeyExchange, GetRandomFailed, SharedSecret, SupportedKxGroup};
 use rustls::{Error, NamedGroup};
 
-use symcrypt::ecdh::EcDh;
-use symcrypt::eckey::CurveType;
+use symcrypt::ecc::{EcKey, EcKeyUsage, CurveType};
 
 /// KxGroup is a struct that easily ties `rustls::NamedGroup` to the `symcrypt_sys::ecurve::CurveType`.
 ///
@@ -25,7 +24,7 @@ pub struct KxGroup {
 /// `pub_key` is a `Vec<u8>` that represents the public key that is tied to the [`EcDh`] state.
 /// The `private_key` is not exposed.
 pub struct KeyExchange {
-    state: EcDh,
+    state: EcKey,
     name: NamedGroup,
     curve_type: CurveType,
     pub_key: Vec<u8>,
@@ -64,14 +63,14 @@ pub const SECP384R1: &dyn SupportedKxGroup = &KxGroup {
 
 /// Impl for the trait SupportedKxGroup
 ///
-/// `start()` creates a new `symcrypt_sys::EcDh` struct and subsequently, a new [`KeyExchange`] struct.
+/// `start()` creates a new `symcrypt::ecc::EcKey` struct and subsequently, a new [`KeyExchange`] struct.
 ///
 /// `name()` returns the `NamedGroup` of the current [`KeyExchange`] group.
 impl SupportedKxGroup for KxGroup {
     fn start(&self) -> Result<Box<(dyn ActiveKeyExchange)>, Error> {
-        let ecdh_state = EcDh::new(self.curve_type).map_err(|_| GetRandomFailed)?;
-        let mut pub_key = ecdh_state
-            .get_public_key_bytes()
+        let ec_key = EcKey::generate_key_pair(self.curve_type, EcKeyUsage::EcDh).map_err(|_| GetRandomFailed)?;
+        let mut pub_key = ec_key
+            .export_public_key()
             .map_err(|_| GetRandomFailed)?;
 
         // Based on RFC 8446 https://www.rfc-editor.org/rfc/rfc8446#section-4.2.8.2.
@@ -84,7 +83,7 @@ impl SupportedKxGroup for KxGroup {
         // Have to pre-append 0x04 to the first element of the vec since SymCrypt expects the caller to do so,
         // and Rustls expects the crypto library to append the 0x04.
         // X25519 does not have the legacy form requirement.
-        match ecdh_state.get_curve() {
+        match ec_key.get_curve_type() {
             CurveType::NistP256 | CurveType::NistP384 => {
                 pub_key.insert(0, 0x04); // Prepend legacy byte to public key
             }
@@ -95,7 +94,7 @@ impl SupportedKxGroup for KxGroup {
         }
 
         Ok(Box::new(KeyExchange {
-            state: ecdh_state,
+            state: ec_key,
             name: self.name,
             curve_type: self.curve_type,
             pub_key: pub_key,
@@ -128,7 +127,7 @@ impl ActiveKeyExchange for KeyExchange {
                 //     opaque Y[coordinate_length];
                 // } UncompressedPointRepresentation;
 
-                // Have to remove the legacy_form 0x04. Rustls does not do this for us, and Symcrypt
+                // Have to remove the legacy_form 0x04. Rustls does not do this for us, and SymCrypt
                 // only expects the X and Y coordinates.
                 &peer_pub_key[1..]
             }
@@ -138,7 +137,7 @@ impl ActiveKeyExchange for KeyExchange {
             }
         };
 
-        let peer_ecdh = match EcDh::from_public_key_bytes(self.curve_type, &new_peer_pub_key) {
+        let peer_ecdh = match EcKey::set_public_key(self.curve_type, &new_peer_pub_key, EcKeyUsage::EcDh) {
             Ok(peer_ecdh) => peer_ecdh,
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
@@ -149,7 +148,7 @@ impl ActiveKeyExchange for KeyExchange {
             }
         };
 
-        let secret_agreement = match EcDh::ecdh_secret_agreement(&self.state, &peer_ecdh) {
+        let secret_agreement = match EcKey::ecdh_secret_agreement(&self.state, peer_ecdh) {
             Ok(secret_agreement) => secret_agreement,
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
@@ -159,7 +158,7 @@ impl ActiveKeyExchange for KeyExchange {
                 return Err(Error::General(custom_error_message));
             }
         };
-        Ok(SharedSecret::from(secret_agreement.as_bytes()))
+        Ok(SharedSecret::from(secret_agreement.as_slice()))
     }
 
     fn pub_key(&self) -> &[u8] {
