@@ -142,6 +142,8 @@ mod hmac;
 mod signer;
 mod tls12;
 mod tls13;
+mod verify;
+use crate::verify::SUPPORTED_SIG_ALGS;
 
 /// Exporting default cipher suites for TLS 1.3
 pub use cipher_suites::{TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384};
@@ -299,64 +301,64 @@ static ALL_CIPHER_SUITES: &[SupportedCipherSuite] = &[
     TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 ];
 
-// TODO: Switch to symcrypt for verification
-static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgorithms {
-    all: &[
-        webpki_algs::ECDSA_P256_SHA256,
-        webpki_algs::ECDSA_P256_SHA384,
-        webpki_algs::ECDSA_P384_SHA256,
-        webpki_algs::ECDSA_P384_SHA384,
-        webpki_algs::RSA_PSS_2048_8192_SHA256_LEGACY_KEY,
-        webpki_algs::RSA_PSS_2048_8192_SHA384_LEGACY_KEY,
-        webpki_algs::RSA_PSS_2048_8192_SHA512_LEGACY_KEY,
-        webpki_algs::RSA_PKCS1_2048_8192_SHA256,
-        webpki_algs::RSA_PKCS1_2048_8192_SHA384,
-        webpki_algs::RSA_PKCS1_2048_8192_SHA512,
-        webpki_algs::RSA_PKCS1_3072_8192_SHA384,
-    ],
-    mapping: &[
-        // Note: for TLS1.2 the curve is not fixed by SignatureScheme. For TLS1.3 it is.
-        (
-            SignatureScheme::ECDSA_NISTP384_SHA384,
-            &[
-                webpki_algs::ECDSA_P384_SHA384,
-                webpki_algs::ECDSA_P256_SHA384,
-            ],
-        ),
-        (
-            SignatureScheme::ECDSA_NISTP256_SHA256,
-            &[
-                webpki_algs::ECDSA_P256_SHA256,
-                webpki_algs::ECDSA_P384_SHA256,
-            ],
-        ),
-        (SignatureScheme::ED25519, &[webpki_algs::ED25519]),
-        (
-            SignatureScheme::RSA_PSS_SHA512,
-            &[webpki_algs::RSA_PSS_2048_8192_SHA512_LEGACY_KEY],
-        ),
-        (
-            SignatureScheme::RSA_PSS_SHA384,
-            &[webpki_algs::RSA_PSS_2048_8192_SHA384_LEGACY_KEY],
-        ),
-        (
-            SignatureScheme::RSA_PSS_SHA256,
-            &[webpki_algs::RSA_PSS_2048_8192_SHA256_LEGACY_KEY],
-        ),
-        (
-            SignatureScheme::RSA_PKCS1_SHA512,
-            &[webpki_algs::RSA_PKCS1_2048_8192_SHA512],
-        ),
-        (
-            SignatureScheme::RSA_PKCS1_SHA384,
-            &[webpki_algs::RSA_PKCS1_2048_8192_SHA384],
-        ),
-        (
-            SignatureScheme::RSA_PKCS1_SHA256,
-            &[webpki_algs::RSA_PKCS1_2048_8192_SHA256],
-        ),
-    ],
-};
+// // TODO: Switch to symcrypt for verification
+// static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgorithms {
+//     all: &[
+//         webpki_algs::ECDSA_P256_SHA256,
+//         webpki_algs::ECDSA_P256_SHA384,
+//         webpki_algs::ECDSA_P384_SHA256,
+//         webpki_algs::ECDSA_P384_SHA384,
+//         webpki_algs::RSA_PSS_2048_8192_SHA256_LEGACY_KEY,
+//         webpki_algs::RSA_PSS_2048_8192_SHA384_LEGACY_KEY,
+//         webpki_algs::RSA_PSS_2048_8192_SHA512_LEGACY_KEY,
+//         webpki_algs::RSA_PKCS1_2048_8192_SHA256,
+//         webpki_algs::RSA_PKCS1_2048_8192_SHA384,
+//         webpki_algs::RSA_PKCS1_2048_8192_SHA512,
+//         webpki_algs::RSA_PKCS1_3072_8192_SHA384,
+//     ],
+//     mapping: &[
+//         // Note: for TLS1.2 the curve is not fixed by SignatureScheme. For TLS1.3 it is.
+//         (
+//             SignatureScheme::ECDSA_NISTP384_SHA384,
+//             &[
+//                 webpki_algs::ECDSA_P384_SHA384,
+//                 webpki_algs::ECDSA_P256_SHA384,
+//             ],
+//         ),
+//         (
+//             SignatureScheme::ECDSA_NISTP256_SHA256,
+//             &[
+//                 webpki_algs::ECDSA_P256_SHA256,
+//                 webpki_algs::ECDSA_P384_SHA256,
+//             ],
+//         ),
+//         (SignatureScheme::ED25519, &[webpki_algs::ED25519]),
+//         (
+//             SignatureScheme::RSA_PSS_SHA512,
+//             &[webpki_algs::RSA_PSS_2048_8192_SHA512_LEGACY_KEY],
+//         ),
+//         (
+//             SignatureScheme::RSA_PSS_SHA384,
+//             &[webpki_algs::RSA_PSS_2048_8192_SHA384_LEGACY_KEY],
+//         ),
+//         (
+//             SignatureScheme::RSA_PSS_SHA256,
+//             &[webpki_algs::RSA_PSS_2048_8192_SHA256_LEGACY_KEY],
+//         ),
+//         (
+//             SignatureScheme::RSA_PKCS1_SHA512,
+//             &[webpki_algs::RSA_PKCS1_2048_8192_SHA512],
+//         ),
+//         (
+//             SignatureScheme::RSA_PKCS1_SHA384,
+//             &[webpki_algs::RSA_PKCS1_2048_8192_SHA384],
+//         ),
+//         (
+//             SignatureScheme::RSA_PKCS1_SHA256,
+//             &[webpki_algs::RSA_PKCS1_2048_8192_SHA256],
+//         ),
+//     ],
+// };
 
 #[derive(Debug)]
 struct SymCrypt;
