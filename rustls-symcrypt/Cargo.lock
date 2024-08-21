@@ -221,8 +221,6 @@ checksum = "81cdd64d312baedb58e21336b31bc043b77e01cc99033ce76ef539f78e965ebc"
 [[package]]
 name = "symcrypt"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97c2b325111415282ad07d0c35b98f1826c0f3b170acc3359b8af9e804c98984"
 dependencies = [
  "lazy_static",
  "libc",
@@ -232,8 +230,6 @@ dependencies = [
 [[package]]
 name = "symcrypt-sys"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9af9e5c6f1d92f1043462d2f3a13d7e0e0af55ccf231a6105c3191a342b076b"
 dependencies = [
  "libc",
 ]
