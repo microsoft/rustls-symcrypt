@@ -142,6 +142,7 @@ mod hmac;
 mod signer;
 mod tls12;
 mod tls13;
+mod asn;
 
 /// Exporting default cipher suites for TLS 1.3
 pub use cipher_suites::{TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384};
@@ -367,6 +368,19 @@ impl SecureRandom for SymCrypt {
         Ok(())
     }
 }
+
+// Key provider for Ring
+impl KeyProvider for SymCrypt {
+    fn load_private_key(
+        &self,
+        key_der: PrivateKeyDer<'static>,
+    ) -> Result<Arc<dyn SigningKey>, Error> {
+        sign::any_supported_type(&key_der)
+    }
+}
+
+
+
 
 #[cfg(test)]
 mod test {
