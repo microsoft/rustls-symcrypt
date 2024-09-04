@@ -3,7 +3,7 @@ use core::hash;
 use rustls::crypto::hmac::Key;
 use symcrypt::ecc::{EcKey, EcKeyUsage, CurveType};
 use symcrypt::hash::{sha256, sha384, sha512, HashAlgorithm};
-use webpki::alg_id::{self, RSA_PSS_SHA256, RSA_PSS_SHA384};
+use webpki::alg_id::{self};
 use webpki::ring as webpki_algs;
 use rustls::{SignatureScheme, SupportedCipherSuite};
 use rustls::crypto::{
@@ -14,12 +14,42 @@ use symcrypt::rsa::RsaKey;
 use symcrypt::rsa::RsaKeyUsage;
 
 
+use rasn::der;
+use rasn::types::Integer;
+use rasn::AsnType;
+use num_bigint::BigUint;
+
+
+#[derive(Debug, AsnType, rasn::Decode)]
+struct RsaPublicKey {
+    modulus: Integer,
+    exponent: Integer,
+}
+
+
+fn extract_rsa_components(encoded: &[u8]) -> (Integer, Integer) {
+    // Decode the DER-encoded RSA public key
+    let rsa_public_key: RsaPublicKey = der::decode(encoded).unwrap();
+
+    // Extract modulus and exponent
+    let modulus = rsa_public_key.modulus;
+    let exponent = rsa_public_key.exponent;
+
+    (modulus, exponent)
+}
+
+// fn integer_to_be_bytes(integer: Integer) -> Vec<u8> {
+//     // Convert `rasn::types::Integer` to `num_bigint::BigUint`
+//     let biguint = BigUint::from_bytes_be(&integer.to_bytes_be());
+
+//     // Convert `BigUint` to big-endian byte array
+//     biguint.to_bytes_be()
+// }
+
 
 
 /// Review
 // 
-// Note that, out of the box, Windows enables the "25519" curve, which may only be used with an SDL exception.
-// we currently have 25519 disabled, do we want to enable it? 
 // if our P1 is microsoft customers, we should want to have it disabled to comply with SDL.
 // If not we should enable it since it's much faster than NIstP256 and NistP384.
 // Most people will high prio 25519 in their list of supported curves, by disabling we are forcing hello retry request
@@ -30,7 +60,6 @@ use symcrypt::rsa::RsaKeyUsage;
 // TODO: Switch to symcrypt for verification
 pub static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgorithms {
     all: &[
-
         // webpki_algs::ECDSA_P256_SHA256,
         ECDSA_P256_SHA256,
         ECDSA_P256_SHA384, 
@@ -42,87 +71,48 @@ pub static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgori
         RSA_PSS_SHA256,
         RSA_PSS_SHA384,
         RSA_PSS_SHA512,
-        ED25519,
-
-
-        webpki_algs::RSA_PSS_2048_8192_SHA256_LEGACY_KEY,
-        webpki_algs::RSA_PSS_2048_8192_SHA384_LEGACY_KEY,
-        webpki_algs::RSA_PSS_2048_8192_SHA512_LEGACY_KEY,
-        webpki_algs::RSA_PKCS1_2048_8192_SHA256,
-        webpki_algs::RSA_PKCS1_2048_8192_SHA384,
-        webpki_algs::RSA_PKCS1_2048_8192_SHA512,
-        webpki_algs::RSA_PKCS1_3072_8192_SHA384,
-
-
-        //ECDSA_P256_SHA256,
-        // ECDSA_P256_SHA384,
-        // ECDSA_P384_SHA256,
-        // ECDSA_P384_SHA384,
-        // RSA_PSS_2048_8192_SHA256_LEGACY_KEY,
-        // RSA_PSS_2048_8192_SHA384_LEGACY_KEY,
-        // RSA_PSS_2048_8192_SHA512_LEGACY_KEY,
-        // RSA_PKCS1_2048_8192_SHA256,
-        // RSA_PKCS1_2048_8192_SHA384,
-        // RSA_PKCS1_2048_8192_SHA512,
-        // RSA_PKCS1_3072_8192_SHA384,
-
-
-        // pub enum SignatureScheme {
-        //     RSA_PKCS1_SHA1 => 0x0201,
-        //     ECDSA_SHA1_Legacy => 0x0203,
-        //     RSA_PKCS1_SHA256 => 0x0401,
-        //     ECDSA_NISTP256_SHA256 => 0x0403,
-        //     RSA_PKCS1_SHA384 => 0x0501,
-        //     ECDSA_NISTP384_SHA384 => 0x0503,
-        //     RSA_PKCS1_SHA512 => 0x0601,
-        //     ECDSA_NISTP521_SHA512 => 0x0603,
-        //     RSA_PSS_SHA256 => 0x0804,
-        //     RSA_PSS_SHA384 => 0x0805,
-        //     RSA_PSS_SHA512 => 0x0806,
-        //     ED25519 => 0x0807,
-        //     ED448 => 0x0808,
-        // }
+        // ED25519,
     ],
     mapping: &[
         // Note: for TLS1.2 the curve is not fixed by SignatureScheme. For TLS1.3 it is.
         (
             SignatureScheme::ECDSA_NISTP384_SHA384,
             &[
-                webpki_algs::ECDSA_P384_SHA384,
-                webpki_algs::ECDSA_P256_SHA384,
+                ECDSA_P384_SHA384,
+                ECDSA_P256_SHA384,
             ],
         ),
         (
             SignatureScheme::ECDSA_NISTP256_SHA256,
             &[
-                webpki_algs::ECDSA_P256_SHA256,
-                webpki_algs::ECDSA_P384_SHA256,
+                ECDSA_P256_SHA256,
+                ECDSA_P384_SHA256,
             ],
         ),
-        (SignatureScheme::ED25519, &[webpki_algs::ED25519]),
+        // (SignatureScheme::ED25519, &[webpki_algs::ED25519]), // Disable this since we dont support ED25519. 
         (
             SignatureScheme::RSA_PSS_SHA512,
-            &[webpki_algs::RSA_PSS_2048_8192_SHA512_LEGACY_KEY],
+            &[RSA_PSS_SHA512]
         ),
         (
             SignatureScheme::RSA_PSS_SHA384,
-            &[webpki_algs::RSA_PSS_2048_8192_SHA384_LEGACY_KEY],
+            &[RSA_PSS_SHA384],
         ),
         (
             SignatureScheme::RSA_PSS_SHA256,
-            &[webpki_algs::RSA_PSS_2048_8192_SHA256_LEGACY_KEY],
+            &[RSA_PSS_SHA256],
         ),
         (
             SignatureScheme::RSA_PKCS1_SHA512,
-            &[webpki_algs::RSA_PKCS1_2048_8192_SHA512],
+            &[RSA_PKCS1_SHA512],
         ),
         (
             SignatureScheme::RSA_PKCS1_SHA384,
-            &[webpki_algs::RSA_PKCS1_2048_8192_SHA384],
+            &[RSA_PKCS1_SHA384],
         ),
         (
             SignatureScheme::RSA_PKCS1_SHA256,
-            &[webpki_algs::RSA_PKCS1_2048_8192_SHA256],
+            &[RSA_PKCS1_SHA256],
         ),
     ],
 };
@@ -194,7 +184,7 @@ pub static ECDSA_P384_SHA384: &dyn SignatureVerificationAlgorithm = &SymCryptAlg
     key_type: KeyType::Ecc(Ecc{curve: CurveType::NistP384}),
 };
 
-/// RSA PKCS1 signatures using SHA-384.
+/// RSA PKCS1 signatures using SHA-256.
 pub static RSA_PKCS1_SHA256: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
     public_key_alg_id: alg_id::RSA_ENCRYPTION,
     signature_alg_id: alg_id::RSA_PKCS1_SHA256,
@@ -210,20 +200,36 @@ pub static RSA_PKCS1_SHA384: &dyn SignatureVerificationAlgorithm = &SymCryptAlgo
     key_type: KeyType::RsaPkcs1(RsaPkcs1{hash_algorithm: HashAlgorithm::Sha384}),
 };
 
-/// RSA PKCS1 signatures using SHA-384.
+/// RSA PKCS1 signatures using SHA-512.
 pub static RSA_PKCS1_SHA512: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
     public_key_alg_id: alg_id::RSA_ENCRYPTION,
     signature_alg_id: alg_id::RSA_PKCS1_SHA512,
-    hasher: hash_sha384,
-    key_type: KeyType::RsaPkcs1(RsaPkcs1{hash_algorithm: HashAlgorithm::Sha384}),
+    hasher: hash_sha512,
+    key_type: KeyType::RsaPkcs1(RsaPkcs1{hash_algorithm: HashAlgorithm::Sha512}),
+};
+
+/// RSA PSS signatures using SHA-256.
+pub static RSA_PSS_SHA256: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
+    public_key_alg_id: alg_id::RSA_ENCRYPTION,
+    signature_alg_id: alg_id::RSA_PSS_SHA256,
+    hasher: hash_sha256,
+    key_type: KeyType::RsaPss(RsaPss{hash_algorithm: HashAlgorithm::Sha256, salt_length: 32}),
 };
 
 /// RSA PSS signatures using SHA-384.
-pub static RSA_PSS_SHA256: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
+pub static RSA_PSS_SHA384: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
     public_key_alg_id: alg_id::RSA_ENCRYPTION,
-    signature_alg_id: alg_id::RSA_PKCS1_SHA512,
+    signature_alg_id: alg_id::RSA_PSS_SHA384,
     hasher: hash_sha384,
-    key_type: KeyType::RsaPkcs1(RsaPkcs1{hash_algorithm: HashAlgorithm::Sha384}),
+    key_type: KeyType::RsaPss(RsaPss{hash_algorithm: HashAlgorithm::Sha384, salt_length: 48}),
+};
+
+/// RSA PSS signatures using SHA-256.
+pub static RSA_PSS_SHA512: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
+    public_key_alg_id: alg_id::RSA_ENCRYPTION,
+    signature_alg_id: alg_id::RSA_PSS_SHA512,
+    hasher: hash_sha512,
+    key_type: KeyType::RsaPss(RsaPss{hash_algorithm: HashAlgorithm::Sha512, salt_length: 64}),
 };
 
 
@@ -244,6 +250,8 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
     ) -> Result<(), InvalidSignature> {
         match &self.key_type {
             KeyType::Ecc(ecc) => {
+
+                println!("ECC");
                 // parse the public key to get the required decoding 
                 // decode the signature? 
                 let ec_key = EcKey::set_public_key(ecc.curve, public_key, EcKeyUsage::EcDsa).unwrap();
@@ -251,14 +259,24 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
                 ec_key.ecdsa_verify(&signature, &hashed_message).map_err(|_| InvalidSignature)
             }
             KeyType::RsaPkcs1(rsa_pkcs1) => {
-                // parse the public key to get the required decoding 
-                let rsa_key = RsaKey::set_public_key(public_key, public_key, RsaKeyUsage::SignAndEncrypt).unwrap();
+
+                println!("PKCS1");
+                let (modulus, exponent) = extract_rsa_components(public_key);
+                // let be_modulus = integer_to_be_bytes(modulus);
+                // let be_exponent = integer_to_be_bytes(exponent);
+
+                let rsa_key = RsaKey::set_public_key(&(modulus.to_bytes_be()).1, &(exponent.to_bytes_be()).1, RsaKeyUsage::SignAndEncrypt).unwrap();
                 let hashed_message = (self.hasher)(message);
                 rsa_key.pkcs1_verify(&hashed_message, signature, rsa_pkcs1.hash_algorithm).map_err(|_| InvalidSignature)
             }
             KeyType::RsaPss(rsa_pss) => {
                 // parse the public key to get the required decoding 
-                let rsa_key = RsaKey::set_public_key(public_key, public_key, RsaKeyUsage::SignAndEncrypt).unwrap();
+                println!("PSS");
+                let (modulus, exponent) = extract_rsa_components(public_key);
+                // let be_modulus = integer_to_be_bytes(modulus);
+                // let be_exponent = integer_to_be_bytes(exponent);
+
+                let rsa_key = RsaKey::set_public_key(&(modulus.to_bytes_be()).1, &(exponent.to_bytes_be()).1, RsaKeyUsage::SignAndEncrypt).unwrap();
                 let hashed_message = (self.hasher)(message);
                 rsa_key.pss_verify(&hashed_message, signature, rsa_pss.hash_algorithm, rsa_pss.salt_length as usize).map_err(|_| InvalidSignature)
             }
@@ -272,11 +290,6 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
     fn signature_alg_id(&self) -> AlgorithmIdentifier {
         self.signature_alg_id
     }
-
-    // Provided Methods
-// source
-// fn fips(&self) -> bool
-// Return true if this is backed by a FIPS-approved implementation.
 
     fn fips(&self) -> bool {
         // For now, leave fips return as always false. 
