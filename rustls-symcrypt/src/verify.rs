@@ -15,7 +15,6 @@ use webpki::alg_id::{self};
 fn extract_rsa_public_key(pub_key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), InvalidSignature> {
     let key = AsnRsaPublicKey::try_from(pub_key).map_err(|_| InvalidSignature)?;
 
-    println!("key: {:?}", key);
     let modulus = key.modulus.as_bytes().to_vec();
     let exponent = key.public_exponent.as_bytes().to_vec();
 
@@ -43,8 +42,6 @@ fn extract_ecc_signature(signature: &[u8]) -> Result<Vec<u8>, InvalidSignature> 
     // an ECC signgature is the same.
     let signature = AsnRsaPublicKey::try_from(signature).map_err(|_| InvalidSignature)?;
 
-    println!("signature: {:?}", signature);
-
     // leading 0's are stripped when using as_bytes()
     // https://docs.rs/pkcs1/0.7.5/pkcs1/struct.UintRef.html
     let r = signature.modulus.as_bytes(); // cast name from `modulus` to `r`
@@ -59,6 +56,9 @@ pub static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgori
         ECDSA_P256_SHA384,
         ECDSA_P384_SHA256,
         ECDSA_P384_SHA384,
+        ECDSA_P521_SHA256,
+        ECDSA_P521_SHA384,
+        ECDSA_P521_SHA512,
         RSA_PKCS1_SHA256,
         RSA_PKCS1_SHA384,
         RSA_PKCS1_SHA512,
@@ -72,11 +72,15 @@ pub static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgori
         // Note: for TLS1.2 the curve is not fixed by SignatureScheme. For TLS1.3 it is.
         (
             SignatureScheme::ECDSA_NISTP384_SHA384,
-            &[ECDSA_P384_SHA384, ECDSA_P256_SHA384],
+            &[ECDSA_P384_SHA384, ECDSA_P256_SHA384, ECDSA_P521_SHA384],
         ),
         (
             SignatureScheme::ECDSA_NISTP256_SHA256,
-            &[ECDSA_P256_SHA256, ECDSA_P384_SHA256],
+            &[ECDSA_P256_SHA256, ECDSA_P384_SHA256, ECDSA_P521_SHA256],
+        ),
+        (
+            SignatureScheme::ECDSA_NISTP521_SHA512,
+            &[ECDSA_P521_SHA512],
         ),
         #[cfg(feature = "x25519")]
         (SignatureScheme::ED25519, &[ED25519]), // Disable by default
@@ -161,6 +165,36 @@ pub static ECDSA_P384_SHA384: &dyn SignatureVerificationAlgorithm = &SymCryptAlg
     hasher: hash_sha384,
     key_type: KeyType::Ecc(Ecc {
         curve: CurveType::NistP384,
+    }),
+};
+
+/// ECDSA signatures using the P-521 curve and SHA-256.
+pub static ECDSA_P521_SHA256: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
+    public_key_alg_id: alg_id::ECDSA_P521,
+    signature_alg_id: alg_id::ECDSA_SHA256,
+    hasher: hash_sha256,
+    key_type: KeyType::Ecc(Ecc {
+        curve: CurveType::NistP521,
+    }),
+};
+
+/// ECDSA signatures using the P-521 curve and SHA-384.
+pub static ECDSA_P521_SHA384: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
+    public_key_alg_id: alg_id::ECDSA_P521,
+    signature_alg_id: alg_id::ECDSA_SHA384,
+    hasher: hash_sha384,
+    key_type: KeyType::Ecc(Ecc {
+        curve: CurveType::NistP521,
+    }),
+};
+
+/// ECDSA signatures using the P-521 curve and SHA-384.
+pub static ECDSA_P521_SHA512: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
+    public_key_alg_id: alg_id::ECDSA_P521,
+    signature_alg_id: alg_id::ECDSA_SHA512,
+    hasher: hash_sha512,
+    key_type: KeyType::Ecc(Ecc {
+        curve: CurveType::NistP521,
     }),
 };
 

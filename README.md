@@ -71,12 +71,3 @@ X25519 // Enabled with the `x25519` feature
 ## Example Code
 
 The `examples` directory showcases how to use the `rustls-symcrypt` provider with `rustls` for both a client configuration and a server configuration by taking advantage of `rustls::ClientConfig::builder_with_provider()`.
-
-```
-// Setting up default symcrypt provider
-
-
-
-
-
-```
