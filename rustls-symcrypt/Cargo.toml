@@ -14,15 +14,11 @@ readme = "README.md"
 [dependencies]
 # Disable aws_ls_rc since it is not needed and increases build time.
 rustls = { version = "0.23.0", features = ["ring", "tls12", "std"], default-features = false }
-symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.2.0" }
-rustls-webpki = "0.102.2"
-picky-asn1-x509 = "0.13.0"
-picky-asn1 = "0.9.0"
-picky-asn1-der = "0.5.0"
-picky = "6.3.0"
-rasn = "0.16.6"
-num-bigint = "0.4"
+symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.3.0" }
 
+pkcs1 = "0.7.5"
+der = " 0.7.9"
+rustls-webpki = "0.102.2"
 
 [features]
 default = []

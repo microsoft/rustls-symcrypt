@@ -2,7 +2,7 @@
 use rustls::crypto::{ActiveKeyExchange, GetRandomFailed, SharedSecret, SupportedKxGroup};
 use rustls::{Error, NamedGroup};
 
-use symcrypt::ecc::{EcKey, EcKeyUsage, CurveType};
+use symcrypt::ecc::{CurveType, EcKey, EcKeyUsage};
 
 /// KxGroup is a struct that easily ties `rustls::NamedGroup` to the `symcrypt_sys::ecurve::CurveType`.
 ///
@@ -32,16 +32,24 @@ pub struct KeyExchange {
 
 /// All supported KeyExchange groups.
 /// ```ignore
+/// SECP521R1
 /// SECP384R1
 /// SECP256R1
 /// X25519 // Enabled with the `x25519` feature
 /// ```
 pub const ALL_KX_GROUPS: &[&dyn SupportedKxGroup] = &[
-    SECP256R1,
+    SECP521R1,
     SECP384R1,
+    SECP256R1,
     #[cfg(feature = "x25519")]
     X25519,
 ];
+
+/// The default reccomdended KeyExchange groups.
+/// ```ignore ```
+/// SECP384R1
+/// SECP256R1
+pub const DEFAULT_KX_GROUPS: &[&dyn SupportedKxGroup] = &[SECP384R1, SECP256R1];
 
 // Since the type trait size cannot be determined at compile time, we must use trait objects, hence the `&dyn SupportedKxGroup`
 // annotation. Similarly, `KxGroup` must then also be taken as a reference.
@@ -56,6 +64,11 @@ pub const SECP256R1: &dyn SupportedKxGroup = &KxGroup {
     curve_type: CurveType::NistP256,
 };
 
+pub const SECP521R1: &dyn SupportedKxGroup = &KxGroup {
+    name: NamedGroup::secp521r1,
+    curve_type: CurveType::NistP521,
+};
+
 pub const SECP384R1: &dyn SupportedKxGroup = &KxGroup {
     name: NamedGroup::secp384r1,
     curve_type: CurveType::NistP384,
@@ -68,10 +81,9 @@ pub const SECP384R1: &dyn SupportedKxGroup = &KxGroup {
 /// `name()` returns the `NamedGroup` of the current [`KeyExchange`] group.
 impl SupportedKxGroup for KxGroup {
     fn start(&self) -> Result<Box<(dyn ActiveKeyExchange)>, Error> {
-        let ec_key = EcKey::generate_key_pair(self.curve_type, EcKeyUsage::EcDh).map_err(|_| GetRandomFailed)?;
-        let mut pub_key = ec_key
-            .export_public_key()
+        let ec_key = EcKey::generate_key_pair(self.curve_type, EcKeyUsage::EcDh)
             .map_err(|_| GetRandomFailed)?;
+        let mut pub_key = ec_key.export_public_key().map_err(|_| GetRandomFailed)?;
 
         // Based on RFC 8446 https://www.rfc-editor.org/rfc/rfc8446#section-4.2.8.2.
         // struct {
@@ -84,7 +96,7 @@ impl SupportedKxGroup for KxGroup {
         // and Rustls expects the crypto library to append the 0x04.
         // X25519 does not have the legacy form requirement.
         match ec_key.get_curve_type() {
-            CurveType::NistP256 | CurveType::NistP384 => {
+            CurveType::NistP256 | CurveType::NistP384 | CurveType::NistP521 => {
                 pub_key.insert(0, 0x04); // Prepend legacy byte to public key
             }
 
@@ -118,8 +130,8 @@ impl SupportedKxGroup for KxGroup {
 impl ActiveKeyExchange for KeyExchange {
     fn complete(self: Box<Self>, peer_pub_key: &[u8]) -> Result<SharedSecret, Error> {
         let new_peer_pub_key = match self.curve_type {
-            CurveType::NistP256 | CurveType::NistP384 => {
-                // If curve type is NistP256 or NistP384, remove the first byte
+            CurveType::NistP256 | CurveType::NistP384 | CurveType::NistP521 => {
+                // If curve type is NistP256 or NistP384 or NistP521 remove the first byte
                 // Based on RFC 8446 https://www.rfc-editor.org/rfc/rfc8446#section-4.2.8.2.
                 // struct {
                 //     uint8 legacy_form = 4;
@@ -137,16 +149,17 @@ impl ActiveKeyExchange for KeyExchange {
             }
         };
 
-        let peer_ecdh = match EcKey::set_public_key(self.curve_type, &new_peer_pub_key, EcKeyUsage::EcDh) {
-            Ok(peer_ecdh) => peer_ecdh,
-            Err(symcrypt_error) => {
-                let custom_error_message = format!(
-                    "SymCryptError: {}",
-                    symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
-                );
-                return Err(Error::General(custom_error_message));
-            }
-        };
+        let peer_ecdh =
+            match EcKey::set_public_key(self.curve_type, &new_peer_pub_key, EcKeyUsage::EcDh) {
+                Ok(peer_ecdh) => peer_ecdh,
+                Err(symcrypt_error) => {
+                    let custom_error_message = format!(
+                        "SymCryptError: {}",
+                        symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
+                    );
+                    return Err(Error::General(custom_error_message));
+                }
+            };
 
         let secret_agreement = match EcKey::ecdh_secret_agreement(&self.state, peer_ecdh) {
             Ok(secret_agreement) => secret_agreement,

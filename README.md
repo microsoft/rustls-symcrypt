@@ -2,11 +2,15 @@
 
 This crate provides integration for using [rust-symcrypt](https://github.com/microsoft/rust-symcrypt) cryptographic functionalities with  [rustls](https://github.com/rustls/rustls), by implementing the required traits specified by `rustls`.
 
-## Status and Platform Support:
-- Currently works with: `rustls = { version = "0.23.0", features = ["ring", "tls12", "std"], default-features = false }`
-- Windows AMD64: Full support.
-- Azure Linux: Full support.
-- Ubuntu: Partial support. While tested, full compatibility and optimal performance on all Ubuntu environments cannot be guaranteed.
+
+### Supported Configurations
+
+| Operating Environment | Architecture      | Dynamic Linking |
+| --------------------- | ----------------- | ----------- |
+| Windows user mode     | AMD64, ARM64      | ✅          | 
+| Ubuntu (Tested via WSL)       | AMD64, ARM64      | ✅          | 
+| Azure Linux 3         | AMD64, ARM64      | ✅          |
+| Azure Linux 2         | AMD64, ARM64      | ❌          |
 
 ## Dependencies
 
@@ -67,3 +71,12 @@ X25519 // Enabled with the `x25519` feature
 ## Example Code
 
 The `examples` directory showcases how to use the `rustls-symcrypt` provider with `rustls` for both a client configuration and a server configuration by taking advantage of `rustls::ClientConfig::builder_with_provider()`.
+
+```
+// Setting up default symcrypt provider
+
+
+
+
+
+```
