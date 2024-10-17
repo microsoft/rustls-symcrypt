@@ -45,8 +45,7 @@ fn extract_ecc_signature(signature: &[u8], curve: CurveType) -> Result<Vec<u8>, 
     // an ECC signgature is the same.
     let signature = AsnRsaPublicKey::try_from(signature).map_err(|_| InvalidSignature)?;
     
-    // r and s will both be the curve size / 2.
-    let component_length = curve.get_size() / 2;
+    let component_length = curve.get_size();
     
     // Leading 0's are stripped when using as_bytes()
     // https://docs.rs/pkcs1/0.7.5/pkcs1/struct.UintRef.html
