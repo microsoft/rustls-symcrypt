@@ -32,24 +32,16 @@ pub struct KeyExchange {
 
 /// All supported KeyExchange groups.
 /// ```ignore
-/// SECP521R1
 /// SECP384R1
 /// SECP256R1
 /// X25519 // Enabled with the `x25519` feature
 /// ```
 pub const ALL_KX_GROUPS: &[&dyn SupportedKxGroup] = &[
-    SECP521R1,
     SECP384R1,
     SECP256R1,
     #[cfg(feature = "x25519")]
     X25519,
 ];
-
-/// The default reccomdended KeyExchange groups.
-/// ```ignore ```
-/// SECP384R1
-/// SECP256R1
-pub const DEFAULT_KX_GROUPS: &[&dyn SupportedKxGroup] = &[SECP384R1, SECP256R1];
 
 // Since the type trait size cannot be determined at compile time, we must use trait objects, hence the `&dyn SupportedKxGroup`
 // annotation. Similarly, `KxGroup` must then also be taken as a reference.
@@ -62,11 +54,6 @@ pub const X25519: &dyn SupportedKxGroup = &KxGroup {
 pub const SECP256R1: &dyn SupportedKxGroup = &KxGroup {
     name: NamedGroup::secp256r1,
     curve_type: CurveType::NistP256,
-};
-
-pub const SECP521R1: &dyn SupportedKxGroup = &KxGroup {
-    name: NamedGroup::secp521r1,
-    curve_type: CurveType::NistP521,
 };
 
 pub const SECP384R1: &dyn SupportedKxGroup = &KxGroup {
@@ -96,12 +83,17 @@ impl SupportedKxGroup for KxGroup {
         // and Rustls expects the crypto library to append the 0x04.
         // X25519 does not have the legacy form requirement.
         match ec_key.get_curve_type() {
-            CurveType::NistP256 | CurveType::NistP384 | CurveType::NistP521 => {
+            CurveType::NistP256 | CurveType::NistP384 => {
                 pub_key.insert(0, 0x04); // Prepend legacy byte to public key
             }
 
             CurveType::Curve25519 => {
                 // Curve25519 curve does not require public key prepending
+            }
+
+            // Not possible to reach this branch since NistP521 struct is not implemented for key exchange
+            CurveType::NistP521 => {
+                return Err(Error::General("NistP521 is not supported for key exchange".to_string()));
             }
         }
 
@@ -130,7 +122,7 @@ impl SupportedKxGroup for KxGroup {
 impl ActiveKeyExchange for KeyExchange {
     fn complete(self: Box<Self>, peer_pub_key: &[u8]) -> Result<SharedSecret, Error> {
         let new_peer_pub_key = match self.curve_type {
-            CurveType::NistP256 | CurveType::NistP384 | CurveType::NistP521 => {
+            CurveType::NistP256 | CurveType::NistP384 => {
                 // If curve type is NistP256 or NistP384 or NistP521 remove the first byte
                 // Based on RFC 8446 https://www.rfc-editor.org/rfc/rfc8446#section-4.2.8.2.
                 // struct {
@@ -141,11 +133,21 @@ impl ActiveKeyExchange for KeyExchange {
 
                 // Have to remove the legacy_form 0x04. Rustls does not do this for us, and SymCrypt
                 // only expects the X and Y coordinates.
-                &peer_pub_key[1..]
+
+                if peer_pub_key.starts_with(&[0x04]) {
+                    &peer_pub_key[1..] // Return a slice starting from the second byte
+                } else {
+                    peer_pub_key // Return the original slice
+                }
             }
+
             CurveType::Curve25519 => {
                 // Do not remove first byte for Curve22519, since Curve25519 only has the x and y coordinates.
                 peer_pub_key
+            }
+
+            CurveType::NistP521 => {
+                return Err(Error::General("NistP521 is not supported for key exchange".to_string()));
             }
         };
 

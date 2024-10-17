@@ -28,6 +28,9 @@ fn extract_ecc_public_key(pub_key: &[u8], curve_type: CurveType) -> Vec<u8> {
         return pub_key[..].to_vec();
     }
     // remove prepended 0x04 legacy byte
+
+
+    // remove only if 0x04 is there 
     pub_key[1..].to_vec()
 }
 
@@ -37,17 +40,44 @@ fn extract_ecc_public_key(pub_key: &[u8], curve_type: CurveType) -> Vec<u8> {
 ///     s INTEGER
 /// }
 /// SymCrypt expects a concatenated r+s with leading padding and leading 0's for both r and s to be removed
-fn extract_ecc_signature(signature: &[u8]) -> Result<Vec<u8>, InvalidSignature> {
-    // We pkcs1::RsaPublicKey because the underlying ASN1 format between an RSA public key and
+fn extract_ecc_signature(signature: &[u8], curve: CurveType) -> Result<Vec<u8>, InvalidSignature> {
+    // We use pkcs1::RsaPublicKey because the underlying ASN1 format between an RSA public key and
     // an ECC signgature is the same.
     let signature = AsnRsaPublicKey::try_from(signature).map_err(|_| InvalidSignature)?;
-
-    // leading 0's are stripped when using as_bytes()
+    
+    // r and s will both be the curve size / 2.
+    let component_length = curve.get_size() / 2;
+    
+    // Leading 0's are stripped when using as_bytes()
     // https://docs.rs/pkcs1/0.7.5/pkcs1/struct.UintRef.html
     let r = signature.modulus.as_bytes(); // cast name from `modulus` to `r`
     let s = signature.public_exponent.as_bytes(); // cast name from `public_exponent` to `s`
 
-    Ok([&r[..], &s[..]].concat())
+    // SymCrypt takes in a concatenated r+s. with the individual r and s components having a size of curve / 2. 
+    // If for example the curve is P256, the r and s components must individually 16 bytes long.
+    // as_bytes() removes all leading 0s, which covers the case if r or s is 17 bytes long for example.
+    // as_bytes() may remove ALL 0's even if one was randomly generated as part of the signature. 
+    // So after we remove the 0's we prepend 0's that were removed until the lengths are 16.
+    // Majority of the time this will not happen but this is to cover corner cases where it does.
+
+    // Ensure r and s are the correct length (pad with leading zeros if necessary).
+    let mut r_padded = Vec::with_capacity(component_length);
+    let mut s_padded = Vec::with_capacity(component_length);
+
+    // Prepend zeros if r is smaller than component_length.
+    if r.len() < component_length {
+        r_padded.extend(std::iter::repeat(0).take(component_length - r.len()));
+    }
+    r_padded.extend_from_slice(r); // Add the actual r bytes.
+
+    // Prepend zeros if s is smaller than component_length.
+    if s.len() < component_length {
+        s_padded.extend(std::iter::repeat(0).take(component_length - s.len()));
+    }
+    s_padded.extend_from_slice(s); // Add the actual s bytes.
+
+    // Concatenate the padded r and s components.
+    Ok([r_padded, s_padded].concat())
 }
 
 pub static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgorithms {
@@ -188,7 +218,7 @@ pub static ECDSA_P521_SHA384: &dyn SignatureVerificationAlgorithm = &SymCryptAlg
     }),
 };
 
-/// ECDSA signatures using the P-521 curve and SHA-384.
+/// ECDSA signatures using the P-521 curve and SHA-512.
 pub static ECDSA_P521_SHA512: &dyn SignatureVerificationAlgorithm = &SymCryptAlgorithm {
     public_key_alg_id: alg_id::ECDSA_P521,
     signature_alg_id: alg_id::ECDSA_SHA512,
@@ -300,11 +330,11 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
                 // NistP256, NistP384, NistP521.
                 let key = extract_ecc_public_key(public_key, ecc.curve);
 
-                // the signature will be in ASM.1 DER format, with seperated `r` and `s` components, need to remove padding
+                // the signature will be in ASM.1 DER format, with separated `r` and `s` components, need to remove padding
                 // and concatenate the two components.
-                let sig = extract_ecc_signature(&signature)?;
+                let sig = extract_ecc_signature(&signature, ecc.curve)?;
 
-                let ec_key = EcKey::set_public_key(ecc.curve, &key, EcKeyUsage::EcDsa).unwrap();
+                let ec_key = EcKey::set_public_key(ecc.curve, &key, EcKeyUsage::EcDsa).map_err(|_| InvalidSignature)?;
                 let hashed_message = (self.hasher)(message);
                 ec_key
                     .ecdsa_verify(&sig, &hashed_message)
@@ -315,7 +345,7 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
                 let (modulus, exponent) = extract_rsa_public_key(public_key)?;
                 let rsa_key =
                     RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::SignAndEncrypt)
-                        .unwrap();
+                        .map_err(|_| InvalidSignature)?;
                 let hashed_message = (self.hasher)(message);
                 rsa_key
                     .pkcs1_verify(&hashed_message, signature, rsa_pkcs1.hash_algorithm)
@@ -326,7 +356,7 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
                 let (modulus, exponent) = extract_rsa_public_key(public_key)?;
                 let rsa_key =
                     RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::SignAndEncrypt)
-                        .unwrap();
+                    .map_err(|_| InvalidSignature)?;
                 let hashed_message = (self.hasher)(message);
                 rsa_key
                     .pss_verify(
@@ -349,8 +379,6 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
     }
 
     fn fips(&self) -> bool {
-        // For now, leave fips return as always false.
-        // TODO: investigate fips flag in symcrypt.
-        false
+        true
     }
 }
