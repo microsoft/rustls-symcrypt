@@ -17,7 +17,7 @@ This example establishes a TLS connection to `rust-lang.org` using `default_symc
 This example establishes a TLS connection to `rust-lang.org` using `default_symcrypt_provider()`. and [rustls-platform-verifier](https://github.com/rustls/rustls-platform-verifier). This program does not take in any certs or keys and instead relies the roots that are managed by your platform.
 
 ### Usage
-`cargo run --bin sample_internet_client_client`
+`cargo run --bin sample_internet_client_platform`
 
 ## 3. Sample Local Client (`sample_local_client`)
 

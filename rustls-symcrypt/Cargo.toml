@@ -1,6 +1,6 @@
 [package]
 name = "rustls-symcrypt"
-authors = ["Microsoft "]
+authors = ["Microsoft"]
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0 OR ISC OR MIT"
@@ -14,7 +14,8 @@ readme = "README.md"
 [dependencies]
 # Disable aws_ls_rc since it is not needed and increases build time.
 rustls = { version = "0.23.0", features = ["ring", "tls12", "std"], default-features = false }
-symcrypt = "0.2.0"
+symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.3.0" }
+pkcs1 = "0.7.5"
 rustls-webpki = "0.102.2"
 
 [features]
