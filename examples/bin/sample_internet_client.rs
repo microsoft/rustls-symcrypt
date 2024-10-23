@@ -30,7 +30,7 @@ fn main() {
     tls.write_all(
         concat!(
             "GET / HTTP/1.1\r\n",
-            "Host: rust-lang.org\r\n",
+            "Host: www.rust-lang.org\r\n",
             "Connection: close\r\n",
             "Accept-Encoding: identity\r\n",
             "\r\n"

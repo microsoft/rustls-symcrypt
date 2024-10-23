@@ -2,16 +2,26 @@
 
 This crate provides integration for using `SymCrypt` cryptographic functionalities with the `rustls` crate, by implementing the required traits specified by `rustls`.
 
-## Platform Support
+### Supported Configurations
 
-- Windows AMD64: Full support.
-- Azure Linux: Full support.
-- Ubuntu: Partial support. While tested, full compatibility and optimal performance on all Ubuntu environments cannot be guaranteed.
+| Operating Environment | Architecture      | Dynamic Linking |
+| --------------------- | ----------------- | ----------- |
+| Windows user mode     | AMD64, ARM64      | ✅          | 
+| Ubuntu (Tested via WSL)       | AMD64, ARM64      | ✅          | 
+| Azure Linux 3         | AMD64, ARM64      | ✅          |
+| Azure Linux 2         | AMD64, ARM64      | ❌          |
+
 
 ## Limitations
 
 - QUIC Protocol: Not supported.
 - Integration Efforts: Ongoing integration with rustls-cng and rustls-platform-verifier.
+
+## Dependencies
+
+This crate depends on the [symcrypt](https://github.com/microsoft/rust-symcrypt) crate and requires you have the necessary `symcrypt` binaries for your architecture.
+Refer to the [rust-symcrypt Quick Start Guide](https://github.com/microsoft/rust-symcrypt/tree/main/rust-symcrypt#quick-start-guide) to download the required binaries.
+
 
 ## Supported Ciphers
 
@@ -48,6 +58,7 @@ Key exchanges are listed below, ordered by preference. IE: `SECP384R1` is prefer
 ```ignore
 SECP384R1
 SECP256R1
+SECP521R1
 X25519 // Enabled with the `x25519` feature
 ```
 
