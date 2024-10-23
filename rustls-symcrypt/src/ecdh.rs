@@ -1,5 +1,5 @@
 //! EcDh functions. For further documentation please refer to rust_symcrypt::ecdh
-use rustls::crypto::{ActiveKeyExchange, GetRandomFailed, SharedSecret, SupportedKxGroup};
+use rustls::crypto::{ActiveKeyExchange, SharedSecret, SupportedKxGroup};
 use rustls::{Error, NamedGroup};
 
 use symcrypt::ecc::{CurveType, EcKey, EcKeyUsage};
@@ -69,8 +69,9 @@ pub const SECP384R1: &dyn SupportedKxGroup = &KxGroup {
 impl SupportedKxGroup for KxGroup {
     fn start(&self) -> Result<Box<(dyn ActiveKeyExchange)>, Error> {
         let ec_key = EcKey::generate_key_pair(self.curve_type, EcKeyUsage::EcDh)
-            .map_err(|_| GetRandomFailed)?;
-        let mut pub_key = ec_key.export_public_key().map_err(|_| GetRandomFailed)?;
+            .map_err(|e| Error::General(format!("SymCrypt key generation failed: {:?}", e)))?;
+        let mut pub_key = ec_key.export_public_key()
+            .map_err(|e| Error::General(format!("SymCrypt public key export failed: {:?}", e)))?;
 
         // Based on RFC 8446 https://www.rfc-editor.org/rfc/rfc8446#section-4.2.8.2.
         // struct {
@@ -137,7 +138,7 @@ impl ActiveKeyExchange for KeyExchange {
                 if peer_pub_key.starts_with(&[0x04]) {
                     &peer_pub_key[1..] // Return a slice starting from the second byte
                 } else {
-                    peer_pub_key // Return the original slice
+                    return Err(Error::General("Invalid public key".to_string()));
                 }
             }
 

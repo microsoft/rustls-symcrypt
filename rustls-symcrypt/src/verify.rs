@@ -21,17 +21,21 @@ fn extract_rsa_public_key(pub_key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), InvalidS
     Ok((modulus, exponent))
 }
 
-// NistP256, NistP384, and NistP521 have a prepended Legacy byte that needs to be removed
-fn extract_ecc_public_key(pub_key: &[u8], curve_type: CurveType) -> Vec<u8> {
-    if curve_type == CurveType::Curve25519 {
-        // x25519 does not have the legacy byte prepended
-        return pub_key[..].to_vec();
+// NistP256, NistP384, and NistP521 have a prepended Legacy byte that needs to be removed.
+// This call will return InvalidSignature if the public key is P256, P384, or P21 and does not have the legacy byte.
+fn extract_ecc_public_key(pub_key: &[u8], curve_type: CurveType) -> Result<Vec<u8>, InvalidSignature> {
+    match curve_type {
+        CurveType::NistP256 | CurveType::NistP384 | CurveType::NistP521 => {
+            if pub_key.starts_with(&[0x04]) {
+                Ok(pub_key[1..].to_vec())
+            } else {
+                Err(InvalidSignature) // Propagate InvalidSignature error back to caller
+            }
+        }
+        CurveType::Curve25519 => {
+            Ok(pub_key[..].to_vec())
+        }
     }
-    // remove prepended 0x04 legacy byte
-
-
-    // remove only if 0x04 is there 
-    pub_key[1..].to_vec()
 }
 
 /// Ecc signatures from the wire will come in the following ASN1 format:
@@ -45,7 +49,7 @@ fn extract_ecc_signature(signature: &[u8], curve: CurveType) -> Result<Vec<u8>, 
     // an ECC signgature is the same.
     let signature = AsnRsaPublicKey::try_from(signature).map_err(|_| InvalidSignature)?;
     
-    let component_length = curve.get_size();
+    let component_length = curve.get_size() as usize;
     
     // Leading 0's are stripped when using as_bytes()
     // https://docs.rs/pkcs1/0.7.5/pkcs1/struct.UintRef.html
@@ -53,16 +57,21 @@ fn extract_ecc_signature(signature: &[u8], curve: CurveType) -> Result<Vec<u8>, 
     let s = signature.public_exponent.as_bytes(); // cast name from `public_exponent` to `s`
 
     // SymCrypt takes in a concatenated r+s. with the individual r and s components having a size of curve / 2. 
-    // If for example the curve is P256, the r and s components must individually 16 bytes long.
-    // as_bytes() removes all leading 0s, which covers the case if r or s is 17 bytes long for example.
+    // If for example the curve is P256, the r and s components must individually 32 bytes long.
+    // as_bytes() removes all leading 0s, which covers the case if r or s is 33 bytes long for example.
     // as_bytes() may remove ALL 0's even if one was randomly generated as part of the signature. 
-    // So after we remove the 0's we prepend 0's that were removed until the lengths are 16.
+    // So after we remove the 0's we prepend 0's that were removed until the lengths are 32.
     // Majority of the time this will not happen but this is to cover corner cases where it does.
 
     // Ensure r and s are the correct length (pad with leading zeros if necessary).
     let mut r_padded = Vec::with_capacity(component_length);
     let mut s_padded = Vec::with_capacity(component_length);
 
+    // In the scenario where there are too many bytes after the leading 0's are removed, return an error.
+    if r.len() > component_length || s.len() > component_length {
+        return Err(InvalidSignature);
+    }
+    
     // Prepend zeros if r is smaller than component_length.
     if r.len() < component_length {
         r_padded.extend(std::iter::repeat(0).take(component_length - r.len()));
@@ -327,9 +336,9 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
             KeyType::Ecc(ecc) => {
                 // the pub_key passed will have a 0x04 legacy byte prepended to the key for the case of
                 // NistP256, NistP384, NistP521.
-                let key = extract_ecc_public_key(public_key, ecc.curve);
+                let key = extract_ecc_public_key(public_key, ecc.curve)?;
 
-                // the signature will be in ASM.1 DER format, with separated `r` and `s` components, need to remove padding
+                // the signature will be in ASN.1 DER format, with separated `r` and `s` components, need to remove padding
                 // and concatenate the two components.
                 let sig = extract_ecc_signature(&signature, ecc.curve)?;
 
@@ -343,7 +352,7 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
                 // extract the modulus and exponent from the public key
                 let (modulus, exponent) = extract_rsa_public_key(public_key)?;
                 let rsa_key =
-                    RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::SignAndEncrypt)
+                    RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::Sign)
                         .map_err(|_| InvalidSignature)?;
                 let hashed_message = (self.hasher)(message);
                 rsa_key
@@ -354,7 +363,7 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
                 // extract the modulus and exponent from the public key
                 let (modulus, exponent) = extract_rsa_public_key(public_key)?;
                 let rsa_key =
-                    RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::SignAndEncrypt)
+                    RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::Sign)
                     .map_err(|_| InvalidSignature)?;
                 let hashed_message = (self.hasher)(message);
                 rsa_key
