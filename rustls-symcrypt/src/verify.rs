@@ -6,6 +6,7 @@ use symcrypt::ecc::{CurveType, EcKey, EcKeyUsage};
 use symcrypt::hash::{sha256, sha384, sha512, HashAlgorithm};
 use symcrypt::rsa::{RsaKey, RsaKeyUsage};
 use webpki::alg_id::{self};
+use pkcs1::RsaPrivateKey;
 
 /// Rsa signatures from the wire will come in the following ASN1 format:
 /// RSAPublicKey ::= SEQUENCE {
@@ -87,6 +88,55 @@ fn extract_ecc_signature(signature: &[u8], curve: CurveType) -> Result<Vec<u8>, 
     // Concatenate the padded r and s components.
     Ok([r_padded, s_padded].concat())
 }
+
+/// RSA private keys from the wire will come in the following ASN1 format:
+/// RSAPrivateKey ::= SEQUENCE {
+///     version           Version,  -- usually 0
+///     modulus           INTEGER,  -- n
+///     publicExponent    INTEGER,  -- e
+///     privateExponent   INTEGER,  -- d
+///     prime1            INTEGER,  -- p
+///     prime2            INTEGER,  -- q
+///     exponent1         INTEGER,  -- d mod (p-1)
+///     exponent2         INTEGER,  -- d mod (q-1)
+///     coefficient       INTEGER,  -- (inverse of q) mod p
+///     otherPrimeInfos   OtherPrimeInfos OPTIONAL
+/// }
+fn extract_rsa_private_key(private_key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>), InvalidSignature> {
+    let key = RsaPrivateKey::try_from(private_key).map_err(|_| InvalidSignature)?;
+
+    let modulus = key.modulus.as_bytes().to_vec();
+    let public_exponent = key.public_exponent.as_bytes().to_vec();
+    let private_exponent = key.private_exponent.as_bytes().to_vec();
+    let prime1 = key.prime1.as_bytes().to_vec();
+    let prime2 = key.prime2.as_bytes().to_vec();
+
+    Ok((modulus, public_exponent, private_exponent, prime1, prime2))
+}
+
+/// Extracts the ECC private key based on the curve type.
+fn extract_ecc_private_key(private_key: &[u8], curve_type: CurveType) -> Result<Vec<u8>, InvalidSignature> {
+    match curve_type {
+        CurveType::NistP256 | CurveType::NistP384 | CurveType::NistP521 => {
+            // Ensure the private key is valid and in the expected format
+            if private_key.is_empty() {
+                Err(InvalidSignature) // Propagate error if the private key is invalid
+            } else {
+                // Typically, the private key bytes are stored directly without any extra bytes.
+                Ok(private_key.to_vec())
+            }
+        }
+        CurveType::Curve25519 => {
+            // Curve25519 keys may have specific format or length requirements.
+            if private_key.len() == 32 {
+                Ok(private_key.to_vec())
+            } else {
+                Err(InvalidSignature) // Propagate error if the private key length is unexpected
+            }
+        }
+    }
+}
+
 
 pub static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgorithms {
     all: &[
