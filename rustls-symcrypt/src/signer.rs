@@ -4,11 +4,11 @@
 /// https://docs.rs/pkcs8/latest/pkcs8/trait.DecodePrivateKey.html#tymethod.from_pkcs8_der
 /// https://docs.rs/pkcs1/latest/pkcs1/trait.DecodeRsaPrivateKey.html#tymethod.from_pkcs1_der
 /// 
-///use rustls::crypto::KeyProvider;
+use rustls::crypto::KeyProvider;
 use rustls::pki_types::PrivateKeyDer;
-///use rustls::sign::SigningKey;
+use rustls::sign::SigningKey;
 use rustls::Error;
-use rustls::SignatureScheme;
+use rustls::{SignatureAlgorithm, SignatureScheme};
 use rustls::sign::Signer;
 use symcrypt::{
     rsa::{RsaKey, RsaKeyUsage},
@@ -23,53 +23,22 @@ use pkcs8::PrivateKeyInfo;
 use pkcs1::der::Decode;
 
 
-/* 
 pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {
-    match der {
-        PrivateKeyDer::Pkcs1(pkcs1) => {
-            // For PKCS#1 RSA keys
-            let rsa_key = RsaSigningKey::new(pkcs1)?;
-            Ok(Arc::new(rsa_key) as Arc<dyn SigningKey>)
-        }
-        PrivateKeyDer::Pkcs8(pkcs8) => {
-            // Attempt to determine if it's RSA or ECDSA
-            let private_key_blob = pkcs8.secret_pkcs8_der(); // returns &[u8] that is DER encoded
-
-            // Check the algorithm OID to determine the key type
-            if is_rsa(private_key_blob) {
-                let rsa_key = RsaSigningKey::new(pkcs8)?;
-                Ok(Arc::new(rsa_key) as Arc<dyn SigningKey>)
-            } else if is_ecdsa(private_key_blob) {
-                let ecdsa_key = EcDsaSigningKey::new(pkcs8)?;
-                Ok(Arc::new(ecdsa_key) as Arc<dyn SigningKey>)
-            } else {
-                Err(Error::General("Unsupported key format".into()))
-            }
-        }
-        PrivateKeyDer::Sec1(sec1) => {
-            let ecdsa_key = EcDsaSigningKey::new(sec1)?;
-            Ok(Arc::new(ecdsa_key) as Arc<dyn SigningKey>)
-        }
-        _ => Err(Error::General("Unsupported key format".into())),
+    if let Ok(rsa) = RsaSigningKey::new(der) {
+        return Ok(Arc::new(rsa));
     }
-}
 
-fn is_rsa(blob: &[u8]) -> bool {
-    // The OID for RSA is typically 1.2.840.113549.1.1.1
-    const RSA_OID_PREFIX: &[u8] = &[0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01];
+    if let Ok(ecdsa) = EcdsaSigningKey::new(der) {
+        return Ok(Arc::new(ecdsa));
+    }
     
-    blob.starts_with(RSA_OID_PREFIX)
+    Err(Error::General(
+        "failed to parse private key as RSA or ECDSA ".into(),
+    ))
 }
 
-fn is_ecdsa(blob: &[u8]) -> bool {
-    // The OID for ECDSA is typically 1.2.840.10045.3.1.7
-    const ECDSA_OID_PREFIX: &[u8] = &[0x30, 0x0a, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
 
-    blob.starts_with(ECDSA_OID_PREFIX)
-}
-*/
-
-
+#[derive(Debug)]
 pub struct RsaSigningKey { 
     key: Arc<RsaKey>
 }
@@ -82,6 +51,7 @@ static ALL_RSA_SCHEMES: &[SignatureScheme] = &[
     SignatureScheme::RSA_PKCS1_SHA384,
     SignatureScheme::RSA_PKCS1_SHA256,
 ];
+
 
 impl RsaSigningKey {
     pub fn new(der: &PrivateKeyDer<'_>) -> Result<Self, Error> {
@@ -130,6 +100,22 @@ impl RsaSigningKey {
         Ok(Self {
             key: Arc::new(key),
         })
+    }
+}
+
+impl SigningKey for RsaSigningKey {
+    fn choose_scheme(&self, offered: &[SignatureScheme]) -> Option<Box<dyn Signer>> {
+        ALL_RSA_SCHEMES
+            .iter()
+            .find(|scheme| offered.contains(scheme))
+            .map(|&scheme| Box::new(RsaSigner {
+                key: Arc::clone(&self.key),
+                scheme,
+            }) as Box<dyn Signer>)
+    }
+
+    fn algorithm(&self) -> SignatureAlgorithm {
+        SignatureAlgorithm::RSA
     }
 }
 
@@ -202,70 +188,80 @@ impl Signer for RsaSigner {
     }
 }
 
+static ALL_ECDSA_SCHEMES: &[SignatureScheme] = &[
+    SignatureScheme::ECDSA_NISTP256_SHA256,
+    SignatureScheme::ECDSA_NISTP384_SHA384,
+    SignatureScheme::ECDSA_NISTP521_SHA512,
+];
 
-
-pub struct EcDsaSigningKey {
+#[derive(Debug)]
+pub struct EcdsaSigningKey {
     key: Arc<EcKey>, 
-    scheme: SignatureScheme
 }
 
 
-impl EcDsaSigningKey {
-    pub fn new(der: &PrivateKeyDer<'_>, scheme: SignatureScheme) -> Result<Self, Box<dyn std::error::Error>> {
+impl EcdsaSigningKey {
+    pub fn new(der: &PrivateKeyDer<'_>) -> Result<Self, Error> {
         let key = match der {
             PrivateKeyDer::Pkcs1(pkcs1) => {
                 // Get the DER-encoded private key blob
-                let private_key_blob = pkcs1.secret_pkcs1_der(); // returns &[u8] that is DER encoded
+                let private_key_blob = pkcs1.secret_pkcs1_der();
 
                 // Determine the curve type for PKCS#1
-
                 let curve_type = match private_key_blob {
-                    blob if blob.starts_with(&[0x30, 0x81]) => CurveType::NistP256, // Example check for NistP256
-                    blob if blob.starts_with(&[0x30, 0x82]) => CurveType::NistP384, // Example check for NistP384
-                    blob if blob.starts_with(&[0x30, 0x83]) => CurveType::NistP521, // Example check for NistP521
-                    blob if blob.starts_with(&[0x30, 0x84]) => CurveType::Curve25519, // Example check for Curve25519
-                    _ => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Unsupported curve type"))),
+                    blob if blob.starts_with(&[0x30, 0x81]) => CurveType::NistP256,
+                    blob if blob.starts_with(&[0x30, 0x82]) => CurveType::NistP384,
+                    blob if blob.starts_with(&[0x30, 0x83]) => CurveType::NistP521,
+                    blob if blob.starts_with(&[0x30, 0x84]) => CurveType::Curve25519,
+                    _ => return Err(Error::General("Unsupported curve type".into())),
                 };
 
                 // Parse the DER-encoded EC private key
-                EcKey::set_key_pair(
-                    curve_type,
-                    private_key_blob,
-                    None, 
-                    EcKeyUsage::EcDsa,
-                ).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Failed to parse PKCS#1 DER"))?
+                EcKey::set_key_pair(curve_type, private_key_blob, None, EcKeyUsage::EcDsa)
+                    .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#1".into()))?
             }
             PrivateKeyDer::Pkcs8(pkcs8) => {
                 // Get the DER-encoded private key blob
-                let private_key_blob = pkcs8.secret_pkcs8_der(); // returns &[u8] that is DER encoded
+                let private_key_blob = pkcs8.secret_pkcs8_der();
 
+                // Determine the curve type for PKCS#8
                 let curve_type = match private_key_blob {
-                    blob if blob.starts_with(&[0x30, 0x81]) => CurveType::NistP256, // Example check for NistP256
-                    blob if blob.starts_with(&[0x30, 0x82]) => CurveType::NistP384, // Example check for NistP384
-                    blob if blob.starts_with(&[0x30, 0x83]) => CurveType::NistP521, // Example check for NistP521
-                    blob if blob.starts_with(&[0x30, 0x84]) => CurveType::Curve25519, // Example check for Curve25519
-                    _ => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Unsupported curve type"))),
+                    blob if blob.starts_with(&[0x30, 0x81]) => CurveType::NistP256,
+                    blob if blob.starts_with(&[0x30, 0x82]) => CurveType::NistP384,
+                    blob if blob.starts_with(&[0x30, 0x83]) => CurveType::NistP521,
+                    blob if blob.starts_with(&[0x30, 0x84]) => CurveType::Curve25519,
+                    _ => return Err(Error::General("Unsupported curve type".into())),
                 };
 
-                EcKey::set_key_pair(
-                    curve_type,
-                    private_key_blob,
-                    None, 
-                    EcKeyUsage::EcDsa,
-                ).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Failed to parse PKCS#8 DER"))?
+                // Parse the DER-encoded EC private key
+                EcKey::set_key_pair(curve_type, private_key_blob, None, EcKeyUsage::EcDsa)
+                    .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#8".into()))?
             }
             _ => {
-                return Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Failed to parse EC private key as either PKCS#1 or PKCS#8",
-                )));
+                return Err(Error::General("Invalid key format: must be PKCS#1 or PKCS#8".into()));
             }
         };
 
         Ok(Self {
             key: Arc::new(key),
-            scheme,
         })
+    }
+}
+
+
+impl SigningKey for EcdsaSigningKey {
+    fn choose_scheme(&self, offered: &[SignatureScheme]) -> Option<Box<dyn Signer>> {
+        ALL_ECDSA_SCHEMES
+            .iter()
+            .find(|scheme| offered.contains(scheme))
+            .map(|&scheme| Box::new(EcdsaSigner {
+                key: Arc::clone(&self.key),
+                scheme,
+            }) as Box<dyn Signer>)
+    }
+
+    fn algorithm(&self) -> SignatureAlgorithm {
+        SignatureAlgorithm::ECDSA
     }
 }
 
@@ -311,7 +307,7 @@ impl Signer for EcdsaSigner {
     }
 }
 
-/* 
+
 #[derive(Debug)]
 pub struct SymCryptProvider;
 
@@ -320,7 +316,6 @@ impl KeyProvider for SymCryptProvider {
         &self,
         key_der: PrivateKeyDer<'static>,
     ) -> Result<Arc<dyn SigningKey>, Error> {
-        sign::any_supported_type(&key_der)
+        any_supported_type(&key_der)
     }
 }
-*/

@@ -68,7 +68,7 @@ pub fn default_symcrypt_provider() -> CryptoProvider {
         kx_groups: ecdh::ALL_KX_GROUPS.to_vec(),
         signature_verification_algorithms: SUPPORTED_SIG_ALGS,
         secure_random: &SymCrypt,
-        key_provider: &signer::Ring,
+        key_provider: &signer::SymCryptProvider,
     }
 }
 
@@ -132,7 +132,7 @@ pub fn custom_symcrypt_provider(
         kx_groups: kx_group,
         signature_verification_algorithms: SUPPORTED_SIG_ALGS,
         secure_random: &SymCrypt,
-        key_provider: &signer::Ring,
+        key_provider: &signer::SymCryptProvider,
     }
 }
 
