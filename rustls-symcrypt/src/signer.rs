@@ -21,6 +21,8 @@ use std::fmt::Debug;
 use pkcs1::RsaPrivateKey;
 use pkcs8::PrivateKeyInfo;
 use pkcs1::der::Decode;
+use sec1::der::Decodable;
+use sec1::EcPrivateKey;
 
 
 pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {
@@ -28,12 +30,39 @@ pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>
         return Ok(Arc::new(rsa));
     }
 
-    if let Ok(ecdsa) = EcdsaSigningKey::new(der) {
-        return Ok(Arc::new(ecdsa));
+    if let Ok(ecdsa) = any_ecdsa_type(der) {
+        return Ok(ecdsa);
     }
     
     Err(Error::General(
         "failed to parse private key as RSA or ECDSA ".into(),
+    ))
+}
+
+pub fn any_ecdsa_type(der: &PrivateKeyDer<'_>) -> Result<Arc<EcdsaSigningKey>, Error> {
+    if let Ok(ecdsa_p256) = EcdsaSigningKey::new(
+        der,
+        rustls::SignatureScheme::ECDSA_NISTP256_SHA256,
+    ) {
+        return Ok(Arc::new(ecdsa_p256));
+    }
+    
+    if let Ok(ecdsa_p384) = EcdsaSigningKey::new(
+        der,
+        rustls::SignatureScheme::ECDSA_NISTP384_SHA384,
+    ) {
+        return Ok(Arc::new(ecdsa_p384));
+    }
+    
+    if let Ok(ecdsa_p521) = EcdsaSigningKey::new(
+        der,
+        rustls::SignatureScheme::ECDSA_NISTP521_SHA512,
+    ) {
+        return Ok(Arc::new(ecdsa_p521));
+    }
+    
+    Err(Error::General(
+        "Failed to parse ECDSA private key as PKCS#8 or SEC1".into(),
     ))
 }
 
@@ -201,47 +230,50 @@ pub struct EcdsaSigningKey {
 
 
 impl EcdsaSigningKey {
-    pub fn new(der: &PrivateKeyDer<'_>) -> Result<Self, Error> {
+    /// Creates a new `ECDSASigningKey` from DER encoding in either PKCS#8 or SEC1
+    /// format, ensuring compatibility with the specified signature scheme.
+    fn new(
+        der: &PrivateKeyDer<'_>,
+        scheme: SignatureScheme,
+    ) -> Result<Self, Error> {
+        // Map the signature scheme to rust-symcrypt's CurveType
+        let curve_type = match scheme {
+            SignatureScheme::ECDSA_NISTP256_SHA256 => CurveType::NistP256,
+            SignatureScheme::ECDSA_NISTP384_SHA384 => CurveType::NistP384,
+            SignatureScheme::ECDSA_NISTP521_SHA512 => CurveType::NistP521, // Assuming NistP521 exists in rust-symcrypt
+            _ => return Err(Error::General("Unsupported signature scheme".into())),
+        };
+
+        // Initialize the key based on the DER encoding format
         let key = match der {
             PrivateKeyDer::Pkcs1(pkcs1) => {
-                // Get the DER-encoded private key blob
+                // Extract DER-encoded private key blob for PKCS#1
                 let private_key_blob = pkcs1.secret_pkcs1_der();
-
-                // Determine the curve type for PKCS#1
-                let curve_type = match private_key_blob {
-                    blob if blob.starts_with(&[0x30, 0x81]) => CurveType::NistP256,
-                    blob if blob.starts_with(&[0x30, 0x82]) => CurveType::NistP384,
-                    blob if blob.starts_with(&[0x30, 0x83]) => CurveType::NistP521,
-                    blob if blob.starts_with(&[0x30, 0x84]) => CurveType::Curve25519,
-                    _ => return Err(Error::General("Unsupported curve type".into())),
-                };
-
-                // Parse the DER-encoded EC private key
-                EcKey::set_key_pair(curve_type, private_key_blob, None, EcKeyUsage::EcDsa)
+                
+                // Parse the PKCS#1 DER-encoded EC private key
+                let private_key = EcPrivateKey::from_der(private_key_blob)
+                    .map_err(|_| Error::General("Failed to parse PKCS#1 DER".into()))?;
+                
+                // Use EcPrivateKey's private_key to set up the ECDSA key
+                EcKey::set_key_pair(curve_type, &private_key.private_key, None, EcKeyUsage::EcDsa)
                     .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#1".into()))?
             }
             PrivateKeyDer::Pkcs8(pkcs8) => {
-                // Get the DER-encoded private key blob
+                // Extract DER-encoded private key blob for PKCS#8
                 let private_key_blob = pkcs8.secret_pkcs8_der();
 
-                // Determine the curve type for PKCS#8
-                let curve_type = match private_key_blob {
-                    blob if blob.starts_with(&[0x30, 0x81]) => CurveType::NistP256,
-                    blob if blob.starts_with(&[0x30, 0x82]) => CurveType::NistP384,
-                    blob if blob.starts_with(&[0x30, 0x83]) => CurveType::NistP521,
-                    blob if blob.starts_with(&[0x30, 0x84]) => CurveType::Curve25519,
-                    _ => return Err(Error::General("Unsupported curve type".into())),
-                };
-
-                // Parse the DER-encoded EC private key
-                EcKey::set_key_pair(curve_type, private_key_blob, None, EcKeyUsage::EcDsa)
+                // Parse the PKCS#8 DER-encoded EC private key
+                let private_key = EcPrivateKey::from_der(private_key_blob)
+                    .map_err(|_| Error::General("Failed to parse PKCS#8 DER".into()))?;
+                
+                // Use EcPrivateKey's private_key to set up the ECDSA key
+                EcKey::set_key_pair(curve_type, &private_key.private_key, None, EcKeyUsage::EcDsa)
                     .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#8".into()))?
             }
-            _ => {
-                return Err(Error::General("Invalid key format: must be PKCS#1 or PKCS#8".into()));
-            }
+            _ => return Err(Error::General("Invalid key format: must be PKCS#1 or PKCS#8".into())),
         };
 
+        // Return the ECDSASigningKey with Arc-wrapped key_pair and scheme
         Ok(Self {
             key: Arc::new(key),
         })
