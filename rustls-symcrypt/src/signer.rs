@@ -33,36 +33,40 @@ pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>
     if let Ok(ecdsa) = any_ecdsa_type(der) {
         return Ok(ecdsa);
     }
-    
+
     Err(Error::General(
         "failed to parse private key as RSA or ECDSA ".into(),
     ))
 }
 
-pub fn any_ecdsa_type(der: &PrivateKeyDer<'_>) -> Result<Arc<EcdsaSigningKey>, Error> {
+
+pub fn any_ecdsa_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {
     if let Ok(ecdsa_p256) = EcdsaSigningKey::new(
         der,
-        rustls::SignatureScheme::ECDSA_NISTP256_SHA256,
+        SignatureScheme::ECDSA_NISTP256_SHA256,
+        &SignatureScheme::ECDSA_NISTP256_SHA256,
     ) {
         return Ok(Arc::new(ecdsa_p256));
     }
-    
+
     if let Ok(ecdsa_p384) = EcdsaSigningKey::new(
         der,
-        rustls::SignatureScheme::ECDSA_NISTP384_SHA384,
+        SignatureScheme::ECDSA_NISTP384_SHA384,
+        &SignatureScheme::ECDSA_NISTP384_SHA384,
     ) {
         return Ok(Arc::new(ecdsa_p384));
     }
-    
+
     if let Ok(ecdsa_p521) = EcdsaSigningKey::new(
         der,
-        rustls::SignatureScheme::ECDSA_NISTP521_SHA512,
+        SignatureScheme::ECDSA_NISTP521_SHA512,
+        &SignatureScheme::ECDSA_NISTP521_SHA512,
     ) {
         return Ok(Arc::new(ecdsa_p521));
     }
-    
+
     Err(Error::General(
-        "Failed to parse ECDSA private key as PKCS#8 or SEC1".into(),
+        "failed to parse ECDSA private key as PKCS#8 or SEC1".into(),
     ))
 }
 
@@ -217,15 +221,12 @@ impl Signer for RsaSigner {
     }
 }
 
-static ALL_ECDSA_SCHEMES: &[SignatureScheme] = &[
-    SignatureScheme::ECDSA_NISTP256_SHA256,
-    SignatureScheme::ECDSA_NISTP384_SHA384,
-    SignatureScheme::ECDSA_NISTP521_SHA512,
-];
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct EcdsaSigningKey {
     key: Arc<EcKey>, 
+    scheme: SignatureScheme,
 }
 
 
@@ -235,6 +236,7 @@ impl EcdsaSigningKey {
     fn new(
         der: &PrivateKeyDer<'_>,
         scheme: SignatureScheme,
+        _sigalg: &'static SignatureScheme,
     ) -> Result<Self, Error> {
         // Map the signature scheme to rust-symcrypt's CurveType
         let curve_type = match scheme {
@@ -246,26 +248,28 @@ impl EcdsaSigningKey {
 
         // Initialize the key based on the DER encoding format
         let key = match der {
-            PrivateKeyDer::Pkcs1(pkcs1) => {
-                // Extract DER-encoded private key blob for PKCS#1
-                let private_key_blob = pkcs1.secret_pkcs1_der();
-                
-                // Parse the PKCS#1 DER-encoded EC private key
+            PrivateKeyDer::Sec1(sec1) => {
+                // Extract DER-encoded private key blob for SEC1
+                let private_key_blob = sec1.secret_sec1_der();
+
+                // Parse the SEC1 DER-encoded EC private key
                 let private_key = EcPrivateKey::from_der(private_key_blob)
-                    .map_err(|_| Error::General("Failed to parse PKCS#1 DER".into()))?;
-                
+                    .map_err(|_| Error::General("Failed to parse SEC1 DER".into()))?;
+
                 // Use EcPrivateKey's private_key to set up the ECDSA key
                 EcKey::set_key_pair(curve_type, &private_key.private_key, None, EcKeyUsage::EcDsa)
-                    .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#1".into()))?
+                    .map_err(|_| Error::General("Failed to set ECDSA key from SEC1".into()))?
             }
             PrivateKeyDer::Pkcs8(pkcs8) => {
+
                 // Extract DER-encoded private key blob for PKCS#8
                 let private_key_blob = pkcs8.secret_pkcs8_der();
-
+                // Parse the DER-encoded private key
+                let private_key_info = PrivateKeyInfo::from_der(private_key_blob);
                 // Parse the PKCS#8 DER-encoded EC private key
-                let private_key = EcPrivateKey::from_der(private_key_blob)
+                let private_key = EcPrivateKey::from_der(&private_key_info.unwrap().private_key)
                     .map_err(|_| Error::General("Failed to parse PKCS#8 DER".into()))?;
-                
+
                 // Use EcPrivateKey's private_key to set up the ECDSA key
                 EcKey::set_key_pair(curve_type, &private_key.private_key, None, EcKeyUsage::EcDsa)
                     .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#8".into()))?
@@ -276,20 +280,21 @@ impl EcdsaSigningKey {
         // Return the ECDSASigningKey with Arc-wrapped key_pair and scheme
         Ok(Self {
             key: Arc::new(key),
+            scheme,
         })
     }
 }
 
-
 impl SigningKey for EcdsaSigningKey {
     fn choose_scheme(&self, offered: &[SignatureScheme]) -> Option<Box<dyn Signer>> {
-        ALL_ECDSA_SCHEMES
-            .iter()
-            .find(|scheme| offered.contains(scheme))
-            .map(|&scheme| Box::new(EcdsaSigner {
+        if offered.contains(&self.scheme) {
+            Some(Box::new(EcdsaSigner {
                 key: Arc::clone(&self.key),
-                scheme,
-            }) as Box<dyn Signer>)
+                scheme: self.scheme,
+            }))
+        } else {
+            None
+        }
     }
 
     fn algorithm(&self) -> SignatureAlgorithm {
@@ -308,8 +313,8 @@ impl Signer for EcdsaSigner {
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
         match self.scheme { 
             SignatureScheme::ECDSA_NISTP256_SHA256 => {
-                let hashed_message = sha256(message);
-                match self.key.ecdsa_sign(&hashed_message) {
+                let hash_value = sha256(message);
+                match self.key.ecdsa_sign(&hash_value) {
                     Ok(signature) => Ok(signature),
                     Err(e) => Err(Error::General(format!("failed to sign message: {}", e))),
                 }
@@ -351,3 +356,5 @@ impl KeyProvider for SymCryptProvider {
         any_supported_type(&key_der)
     }
 }
+
+
