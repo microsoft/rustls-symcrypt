@@ -1,10 +1,4 @@
-/// function used are defined here
-/// https://github.com/microsoft/rust-symcrypt/blob/main/rust-symcrypt/src/ecc/mod.rs
-/// https://github.com/microsoft/rust-symcrypt/blob/main/rust-symcrypt/src/rsa/mod.rs
-/// https://docs.rs/pkcs8/latest/pkcs8/trait.DecodePrivateKey.html#tymethod.from_pkcs8_der
-/// https://docs.rs/pkcs1/latest/pkcs1/trait.DecodeRsaPrivateKey.html#tymethod.from_pkcs1_der
-/// https://docs.rs/der/latest/der/trait.Encode.html
-///
+
 use rustls::crypto::KeyProvider;
 use rustls::pki_types::PrivateKeyDer;
 use rustls::sign::Signer;
@@ -282,12 +276,17 @@ impl EcdsaSigningKey {
             PrivateKeyDer::Pkcs8(pkcs8) => {
                 // Extract DER-encoded private key blob for PKCS#8
                 let private_key_blob = pkcs8.secret_pkcs8_der();
+                
                 // Parse the DER-encoded private key
-                let private_key_info = PrivateKeyInfo::from_der(private_key_blob);
+                let private_key_info = match PrivateKeyInfo::from_der(private_key_blob) {
+                    Ok(info) => info,
+                    Err(_) => return Err(Error::General("Failed to parse private key info from DER".into())),
+                };
+                
                 // Parse the PKCS#8 DER-encoded EC private key
-                let private_key = EcPrivateKey::from_der(&private_key_info.unwrap().private_key)
+                let private_key = EcPrivateKey::from_der(&private_key_info.private_key)
                     .map_err(|_| Error::General("Failed to parse PKCS#8 DER".into()))?;
-
+                
                 // Use EcPrivateKey's private_key to set up the ECDSA key
                 EcKey::set_key_pair(
                     curve_type,
@@ -296,10 +295,10 @@ impl EcdsaSigningKey {
                     EcKeyUsage::EcDsa,
                 )
                 .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#8".into()))?
-            }
-            _ => {
-                return Err(Error::General(
-                    "Invalid key format: must be PKCS#1 or PKCS#8".into(),
+                }
+                _ => {
+                    return Err(Error::General(
+                        "Invalid key format: must be PKCS#1 or PKCS#8".into(),
                 ))
             }
         };
@@ -355,10 +354,22 @@ impl Signer for EcdsaSigner {
         // Step 3: Split the signature into r and s components
         let (r, s) = signature.split_at(signature.len() / 2);
 
-        // Step 4: Create an RsaPublicKey structure with r and s
+        // Step 4: Create an RsaPublicKey structure which contains the signature r and s
+        // ECSignatureData is encoded as sequence of two integers. RsaPublicKey is also encoded as sequence of two integers.
+        // Will use RsaPublicKey to enode where modulus contains r and public_exponent contains s
+        let modulus = match UintRef::new(r) {
+            Ok(value) => value,
+            Err(_) => return Err(Error::General("Failed to create UintRef for modulus".into())),
+        };
+        
+        let public_exponent = match UintRef::new(s) {
+            Ok(value) => value,
+            Err(_) => return Err(Error::General("Failed to create UintRef for public exponent".into())),
+        };
+        
         let ec_sig_data = ECSignatureData {
-            modulus: UintRef::new(r).unwrap(),
-            public_exponent: UintRef::new(s).unwrap(),
+            modulus,
+            public_exponent,
         };
 
         // Step 5: Encode the RsaPublicKey using the Encode trait
