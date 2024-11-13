@@ -23,6 +23,10 @@ use pkcs1::RsaPublicKey as ECSignatureData;
 use der::Encode;
 use pkcs1::UintRef;
 
+const SHA256_SALT_LENGTH: usize = 32; // 256 bits / 8
+const SHA384_SALT_LENGTH: usize = 48; // 384 bits / 8
+const SHA512_SALT_LENGTH: usize = 64; // 512 bits / 8
+
 pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {
     if let Ok(rsa) = RsaSigningKey::new(der) {
         return Ok(Arc::new(rsa));
@@ -192,7 +196,7 @@ impl Signer for RsaSigner {
                 let hashed_message = sha256(message);
                 match self
                     .key
-                    .pss_sign(&hashed_message, HashAlgorithm::Sha256, 32)
+                    .pss_sign(&hashed_message, HashAlgorithm::Sha256, SHA256_SALT_LENGTH)
                 {
                     Ok(signature) => Ok(signature),
                     Err(e) => Err(Error::General(format!("failed to sign message: {}", e))),
@@ -202,7 +206,7 @@ impl Signer for RsaSigner {
                 let hashed_message = sha384(message);
                 match self
                     .key
-                    .pss_sign(&hashed_message, HashAlgorithm::Sha384, 48)
+                    .pss_sign(&hashed_message, HashAlgorithm::Sha384, SHA384_SALT_LENGTH)
                 {
                     Ok(signature) => Ok(signature),
                     Err(e) => Err(Error::General(format!("failed to sign message: {}", e))),
@@ -212,7 +216,7 @@ impl Signer for RsaSigner {
                 let hashed_message = sha512(message);
                 match self
                     .key
-                    .pss_sign(&hashed_message, HashAlgorithm::Sha512, 64)
+                    .pss_sign(&hashed_message, HashAlgorithm::Sha512, SHA512_SALT_LENGTH)
                 {
                     Ok(signature) => Ok(signature),
                     Err(e) => Err(Error::General(format!("failed to sign message: {}", e))),
@@ -398,3 +402,4 @@ impl KeyProvider for SymCryptProvider {
         any_supported_type(&key_der)
     }
 }
+
