@@ -38,7 +38,7 @@ pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>
     ))
 }
 
-pub fn any_ecdsa_type(der: &PrivateKeyDer<'_>) -> Result<Arc<EcdsaSigningKey>, Error> {
+pub fn any_ecdsa_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {
     if let Ok(ecdsa_p256) = EcdsaSigningKey::new(
         der,
         SignatureScheme::ECDSA_NISTP256_SHA256,
@@ -391,3 +391,4 @@ impl KeyProvider for SymCryptProvider {
         any_supported_type(&key_der)
     }
 }
+
