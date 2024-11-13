@@ -22,10 +22,7 @@ use std::sync::Arc;
 use pkcs1::RsaPublicKey as ECSignatureData;
 use der::Encode;
 use pkcs1::UintRef;
-
-const SHA256_SALT_LENGTH: usize = 32; // 256 bits / 8
-const SHA384_SALT_LENGTH: usize = 48; // 384 bits / 8
-const SHA512_SALT_LENGTH: usize = 64; // 512 bits / 8
+use symcrypt::hash::{SHA256_RESULT_SIZE, SHA384_RESULT_SIZE, SHA512_RESULT_SIZE};
 
 pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {
     if let Ok(rsa) = RsaSigningKey::new(der) {
@@ -41,34 +38,27 @@ pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>
     ))
 }
 
-pub fn any_ecdsa_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {
+pub fn any_ecdsa_type(der: &PrivateKeyDer<'_>) -> Result<Arc<EcdsaSigningKey>, Error> {
     if let Ok(ecdsa_p256) = EcdsaSigningKey::new(
         der,
         SignatureScheme::ECDSA_NISTP256_SHA256,
-        &SignatureScheme::ECDSA_NISTP256_SHA256,
     ) {
-        return Ok(Arc::new(ecdsa_p256));
-    }
-
-    if let Ok(ecdsa_p384) = EcdsaSigningKey::new(
+        Ok(Arc::new(ecdsa_p256))
+    } else if let Ok(ecdsa_p384) = EcdsaSigningKey::new(
         der,
         SignatureScheme::ECDSA_NISTP384_SHA384,
-        &SignatureScheme::ECDSA_NISTP384_SHA384,
     ) {
-        return Ok(Arc::new(ecdsa_p384));
-    }
-
-    if let Ok(ecdsa_p521) = EcdsaSigningKey::new(
+        Ok(Arc::new(ecdsa_p384))
+    } else if let Ok(ecdsa_p521) = EcdsaSigningKey::new(
         der,
         SignatureScheme::ECDSA_NISTP521_SHA512,
-        &SignatureScheme::ECDSA_NISTP521_SHA512,
     ) {
-        return Ok(Arc::new(ecdsa_p521));
+        Ok(Arc::new(ecdsa_p521))
+    } else {
+        Err(Error::General(
+            "failed to parse ECDSA private key as PKCS#8 or SEC1".into(),
+        ))
     }
-
-    Err(Error::General(
-        "failed to parse ECDSA private key as PKCS#8 or SEC1".into(),
-    ))
 }
 
 #[derive(Debug)]
@@ -196,7 +186,7 @@ impl Signer for RsaSigner {
                 let hashed_message = sha256(message);
                 match self
                     .key
-                    .pss_sign(&hashed_message, HashAlgorithm::Sha256, SHA256_SALT_LENGTH)
+                    .pss_sign(&hashed_message, HashAlgorithm::Sha256, SHA256_RESULT_SIZE)
                 {
                     Ok(signature) => Ok(signature),
                     Err(e) => Err(Error::General(format!("failed to sign message: {}", e))),
@@ -206,7 +196,7 @@ impl Signer for RsaSigner {
                 let hashed_message = sha384(message);
                 match self
                     .key
-                    .pss_sign(&hashed_message, HashAlgorithm::Sha384, SHA384_SALT_LENGTH)
+                    .pss_sign(&hashed_message, HashAlgorithm::Sha384, SHA384_RESULT_SIZE)
                 {
                     Ok(signature) => Ok(signature),
                     Err(e) => Err(Error::General(format!("failed to sign message: {}", e))),
@@ -216,7 +206,7 @@ impl Signer for RsaSigner {
                 let hashed_message = sha512(message);
                 match self
                     .key
-                    .pss_sign(&hashed_message, HashAlgorithm::Sha512, SHA512_SALT_LENGTH)
+                    .pss_sign(&hashed_message, HashAlgorithm::Sha512, SHA512_RESULT_SIZE)
                 {
                     Ok(signature) => Ok(signature),
                     Err(e) => Err(Error::General(format!("failed to sign message: {}", e))),
@@ -248,7 +238,6 @@ impl EcdsaSigningKey {
     fn new(
         der: &PrivateKeyDer<'_>,
         scheme: SignatureScheme,
-        _sigalg: &'static SignatureScheme,
     ) -> Result<Self, Error> {
         // Map the signature scheme to rust-symcrypt's CurveType
         let curve_type = match scheme {
@@ -299,10 +288,10 @@ impl EcdsaSigningKey {
                     EcKeyUsage::EcDsa,
                 )
                 .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#8".into()))?
-                }
-                _ => {
-                    return Err(Error::General(
-                        "Invalid key format: must be PKCS#1 or PKCS#8".into(),
+            }
+            _ => {
+                return Err(Error::General(
+                    "Invalid key format: must be PKCS#1 or PKCS#8".into(),
                 ))
             }
         };
@@ -402,4 +391,3 @@ impl KeyProvider for SymCryptProvider {
         any_supported_type(&key_der)
     }
 }
-
