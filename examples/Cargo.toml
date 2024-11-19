@@ -10,12 +10,14 @@ publish = false
 [dependencies]
 rustls-symcrypt = {path = "../rustls-symcrypt"}
 rustls = { version = "0.23.0", features = ["ring", "tls12", "std"], default-features = false }
+rustls-cng = "0.5.1"
+
 webpki-roots = "0.26"
 webpki = {package = "rustls-webpki", version = "0.102", features = ["alloc"], default-features = false}
 rustls-pemfile = "2.1.0"
 cmake = "0.1"
 once_cell = "1.8.0"
-rustls-platform-verifier = "0.3.1"
+rustls-platform-verifier = "0.4.0"
 
 [[bin]]
 name = "sample_internet_client"
@@ -32,3 +34,11 @@ path = "bin/sample_local_client.rs"
 [[bin]]
 name = "sample_internet_client_platform"
 path = "bin/sample_internet_client_platform.rs"
+
+[[bin]]
+name = "sample_local_client_cng"
+path = "bin/sample_local_client_cng.rs"
+
+[[bin]]
+name = "sample_server_cng"
+path = "bin/sample_server_cng.rs"
