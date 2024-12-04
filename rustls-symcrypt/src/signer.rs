@@ -1,4 +1,3 @@
-
 use rustls::crypto::KeyProvider;
 use rustls::pki_types::PrivateKeyDer;
 use rustls::sign::Signer;
@@ -19,8 +18,8 @@ use sec1::EcPrivateKey;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use pkcs1::RsaPublicKey as ECSignatureData;
 use der::Encode;
+use pkcs1::RsaPublicKey as ECSignatureData;
 use pkcs1::UintRef;
 use symcrypt::hash::{SHA256_RESULT_SIZE, SHA384_RESULT_SIZE, SHA512_RESULT_SIZE};
 
@@ -34,25 +33,18 @@ pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>
     }
 
     Err(Error::General(
-        "failed to parse private key as RSA or ECDSA ".into(),
+        "failed to parse private key as RSA or ECDSA".into(),
     ))
 }
 
 pub fn any_ecdsa_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {
-    if let Ok(ecdsa_p256) = EcdsaSigningKey::new(
-        der,
-        SignatureScheme::ECDSA_NISTP256_SHA256,
-    ) {
+    if let Ok(ecdsa_p256) = EcdsaSigningKey::new(der, SignatureScheme::ECDSA_NISTP256_SHA256) {
         Ok(Arc::new(ecdsa_p256))
-    } else if let Ok(ecdsa_p384) = EcdsaSigningKey::new(
-        der,
-        SignatureScheme::ECDSA_NISTP384_SHA384,
-    ) {
+    } else if let Ok(ecdsa_p384) = EcdsaSigningKey::new(der, SignatureScheme::ECDSA_NISTP384_SHA384)
+    {
         Ok(Arc::new(ecdsa_p384))
-    } else if let Ok(ecdsa_p521) = EcdsaSigningKey::new(
-        der,
-        SignatureScheme::ECDSA_NISTP521_SHA512,
-    ) {
+    } else if let Ok(ecdsa_p521) = EcdsaSigningKey::new(der, SignatureScheme::ECDSA_NISTP521_SHA512)
+    {
         Ok(Arc::new(ecdsa_p521))
     } else {
         Err(Error::General(
@@ -153,13 +145,6 @@ struct RsaSigner {
 
 impl Signer for RsaSigner {
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
-        // from Ring, do we need to add padding???
-
-        // Sign msg. msg is digested using the digest algorithm from padding_alg and the digest is then padded using the padding algorithm from padding_alg.
-        // The signature it written into signature; signature's length must be exactly the length returned by public_modulus_len().
-        // Many other crypto libraries have signing functions that takes a precomputed digest as input,
-        // instead of the message to digest. This function does not take a precomputed digest; instead, sign calculates the digest itself.
-
         match self.scheme {
             SignatureScheme::RSA_PKCS1_SHA256 => {
                 let hashed_message = sha256(message);
@@ -225,7 +210,6 @@ impl Signer for RsaSigner {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct EcdsaSigningKey {
     key: Arc<EcKey>,
@@ -235,15 +219,12 @@ pub struct EcdsaSigningKey {
 impl EcdsaSigningKey {
     /// Creates a new `ECDSASigningKey` from DER encoding in either PKCS#8 or SEC1
     /// format, ensuring compatibility with the specified signature scheme.
-    fn new(
-        der: &PrivateKeyDer<'_>,
-        scheme: SignatureScheme,
-    ) -> Result<Self, Error> {
+    fn new(der: &PrivateKeyDer<'_>, scheme: SignatureScheme) -> Result<Self, Error> {
         // Map the signature scheme to rust-symcrypt's CurveType
         let curve_type = match scheme {
             SignatureScheme::ECDSA_NISTP256_SHA256 => CurveType::NistP256,
             SignatureScheme::ECDSA_NISTP384_SHA384 => CurveType::NistP384,
-            SignatureScheme::ECDSA_NISTP521_SHA512 => CurveType::NistP521, // Assuming NistP521 exists in rust-symcrypt
+            SignatureScheme::ECDSA_NISTP521_SHA512 => CurveType::NistP521,
             _ => return Err(Error::General("Unsupported signature scheme".into())),
         };
 
@@ -269,17 +250,21 @@ impl EcdsaSigningKey {
             PrivateKeyDer::Pkcs8(pkcs8) => {
                 // Extract DER-encoded private key blob for PKCS#8
                 let private_key_blob = pkcs8.secret_pkcs8_der();
-                
+
                 // Parse the DER-encoded private key
                 let private_key_info = match PrivateKeyInfo::from_der(private_key_blob) {
                     Ok(info) => info,
-                    Err(_) => return Err(Error::General("Failed to parse private key info from DER".into())),
+                    Err(_) => {
+                        return Err(Error::General(
+                            "Failed to parse private key info from DER".into(),
+                        ))
+                    }
                 };
-                
+
                 // Parse the PKCS#8 DER-encoded EC private key
                 let private_key = EcPrivateKey::from_der(&private_key_info.private_key)
                     .map_err(|_| Error::General("Failed to parse PKCS#8 DER".into()))?;
-                
+
                 // Use EcPrivateKey's private_key to set up the ECDSA key
                 EcKey::set_key_pair(
                     curve_type,
@@ -327,7 +312,6 @@ struct EcdsaSigner {
     scheme: SignatureScheme,
 }
 
-
 impl Signer for EcdsaSigner {
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
         // Step 1: Hash the message based on the scheme
@@ -352,17 +336,25 @@ impl Signer for EcdsaSigner {
         // Will use RsaPublicKey to enode where modulus contains r and public_exponent contains s
         let modulus = match UintRef::new(r) {
             Ok(value) => value,
-            Err(_) => return Err(Error::General("Failed to create UintRef for modulus".into())),
+            Err(_) => {
+                return Err(Error::General(
+                    "Failed to create UintRef for modulus".into(),
+                ))
+            }
         };
-        
+
         let public_exponent = match UintRef::new(s) {
             Ok(value) => value,
-            Err(_) => return Err(Error::General("Failed to create UintRef for public exponent".into())),
+            Err(_) => {
+                return Err(Error::General(
+                    "Failed to create UintRef for public exponent".into(),
+                ))
+            }
         };
-        
+
         let ec_sig_data = ECSignatureData {
-            modulus,
-            public_exponent,
+            modulus,  // r
+            public_exponent,  // s
         };
 
         // Step 5: Encode the RsaPublicKey using the Encode trait
@@ -378,7 +370,6 @@ impl Signer for EcdsaSigner {
         self.scheme
     }
 }
-
 
 #[derive(Debug)]
 pub struct SymCryptProvider;
