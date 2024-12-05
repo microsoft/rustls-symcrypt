@@ -331,7 +331,7 @@ impl Signer for EcdsaSigner {
         // Step 3: Split the signature into r and s components
         let (r, s) = signature.split_at(signature.len() / 2);
 
-        // Step 4: Create an RsaPublicKey structure which contains the signature r and s
+        // Step 4: Create a ECSignature structure which is mapped to pkcs1::RsaPublicKey, which contains the signature r and s
         // ECSignatureData is encoded as sequence of two integers. RsaPublicKey is also encoded as sequence of two integers.
         // Will use RsaPublicKey to enode where modulus contains r and public_exponent contains s
         let modulus = match UintRef::new(r) {
@@ -382,4 +382,3 @@ impl KeyProvider for SymCryptProvider {
         any_supported_type(&key_der)
     }
 }
-
