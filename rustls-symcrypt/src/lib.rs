@@ -47,20 +47,18 @@ pub use ecdh::X25519;
 /// use std::sync::Arc;
 /// use webpki_roots;
 ///
-/// fn main() {
-///     let mut root_store = RootCertStore {
-///         roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
-///     };
+/// let mut root_store = RootCertStore {
+///     roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+/// };
 ///
-///     let mut config =
-///         ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
-///            .with_safe_default_protocol_versions()
-///             .unwrap()
-///             .with_root_certificates(root_store)
-///             .with_no_client_auth();
+/// let mut config =
+/// ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
+///     .with_safe_default_protocol_versions()
+///     .unwrap()
+///     .with_root_certificates(root_store)
+///     .with_no_client_auth();
+/// // Rest of the connection setup
 ///
-///     // Rest of the connection setup
-/// }
 /// ```
 pub fn default_symcrypt_provider() -> CryptoProvider {
     CryptoProvider {
@@ -93,25 +91,22 @@ pub fn default_symcrypt_provider() -> CryptoProvider {
 /// use std::sync::Arc;
 /// use webpki_roots;
 ///
-/// fn main() {
-///     let mut root_store = RootCertStore {
-///         roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
-///     };
-///      
-///     // Set custom config of cipher suites that have been imported from rustls_symcrypt.
-///     let cipher_suites = vec![TLS13_AES_128_GCM_SHA256];
-///     let kx_group = vec![SECP256R1];
-///
-///     let mut config =
-///         ClientConfig::builder_with_provider(Arc::new(custom_symcrypt_provider(
-///             Some(cipher_suites), Some(kx_group))))
-///                 .with_safe_default_protocol_versions()
-///                 .unwrap()
-///                 .with_root_certificates(root_store)
-///                 .with_no_client_auth();
-///
+/// let mut root_store = RootCertStore {
+///     roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+/// };
+
+/// // Set custom config of cipher suites that have been imported from rustls_symcrypt.
+/// let cipher_suites = vec![TLS13_AES_128_GCM_SHA256];
+/// let kx_group = vec![SECP256R1];
+
+/// let mut config =
+///     ClientConfig::builder_with_provider(Arc::new(custom_symcrypt_provider(
+///         Some(cipher_suites), Some(kx_group))))
+///             .with_safe_default_protocol_versions()
+///             .unwrap()
+///             .with_root_certificates(root_store)
+///             .with_no_client_auth();
 ///     // Rest of the connection setup
-/// }
 /// ```
 pub fn custom_symcrypt_provider(
     provided_cipher_suites: Option<Vec<SupportedCipherSuite>>,
@@ -124,7 +119,7 @@ pub fn custom_symcrypt_provider(
 
     let kx_group = match provided_kx_group {
         Some(groups) if !groups.is_empty() => groups, // Use provided non-empty groups
-        _ => ecdh::ALL_KX_GROUPS.to_vec(),        // Use default groups if None or empty
+        _ => ecdh::ALL_KX_GROUPS.to_vec(),            // Use default groups if None or empty
     };
 
     CryptoProvider {

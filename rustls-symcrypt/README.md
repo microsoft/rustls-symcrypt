@@ -93,19 +93,18 @@ use rustls_symcrypt::default_symcrypt_provider;
 use std::sync::Arc;
 use webpki_roots;
 
-fn main() {
-    let mut root_store = RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
-    };
-    let mut config =
-        ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
-            .with_safe_default_protocol_versions()
-            .unwrap()
-            .with_root_certificates(root_store)
-            .with_no_client_auth();
+let mut root_store = RootCertStore {
+    roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+};
+let mut config =
+    ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
 
-    // Rest of the connection setup
-}
+// Rest of the connection setup
+
 ```
 
 ### Custom Configuration
@@ -118,23 +117,22 @@ use rustls_symcrypt::{custom_symcrypt_provider, TLS13_AES_128_GCM_SHA256, SECP25
 use std::sync::Arc;
 use webpki_roots;
 
-fn main() {
-    let mut root_store = RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
-    };
+let mut root_store = RootCertStore {
+    roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+};
 
-    // Set custom config of cipher suites that have been imported from rustls_symcrypt.
-    let cipher_suites = vec![TLS13_AES_128_GCM_SHA256];
-    let kx_group = vec![SECP256R1];
+// Set custom config of cipher suites that have been imported from rustls_symcrypt.
+let cipher_suites = vec![TLS13_AES_128_GCM_SHA256];
+let kx_group = vec![SECP256R1];
 
-    let mut config =
-        ClientConfig::builder_with_provider(Arc::new(custom_symcrypt_provider(
-            Some(cipher_suites), Some(kx_group))))
-                .with_safe_default_protocol_versions()
-                .unwrap()
-                .with_root_certificates(root_store)
-                .with_no_client_auth();
+let mut config =
+    ClientConfig::builder_with_provider(Arc::new(custom_symcrypt_provider(
+        Some(cipher_suites), Some(kx_group))))
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
 
-    // Rest of the connection setup
-}
+// Rest of the connection setup
+
 ```
