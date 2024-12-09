@@ -6,7 +6,7 @@ use rustls::crypto::cipher::{
     Tls13AeadAlgorithm, UnsupportedOperationError,
 };
 use rustls::ConnectionTrafficSecrets;
-use symcrypt::block_ciphers::BlockCipherType;
+use symcrypt::cipher::BlockCipherType;
 
 use symcrypt::gcm::GcmExpandedKey;
 const GCM_TAG_LENGTH: usize = 16;
@@ -44,7 +44,7 @@ impl Tls13AeadAlgorithm for Tls13ChaCha {
 
         Box::new(Tls13ChaCha20Poly1305 {
             key: chacha_key,
-            iv: iv,
+            iv,
         })
     }
 
@@ -55,7 +55,7 @@ impl Tls13AeadAlgorithm for Tls13ChaCha {
 
         Box::new(Tls13ChaCha20Poly1305 {
             key: chacha_key,
-            iv: iv,
+            iv,
         })
     }
 
@@ -123,9 +123,9 @@ impl MessageEncrypter for Tls13ChaCha20Poly1305 {
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
                     "SymCryptError: {}",
-                    symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
+                    symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
                 );
-                return Err(rustls::Error::General(custom_error_message));
+                Err(rustls::Error::General(custom_error_message))
             }
         }
     }
@@ -178,9 +178,9 @@ impl MessageDecrypter for Tls13ChaCha20Poly1305 {
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
                     "SymCryptError: {}",
-                    symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
+                    symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
                 );
-                return Err(rustls::Error::General(custom_error_message));
+                Err(rustls::Error::General(custom_error_message))
             }
         }
     }
@@ -210,7 +210,7 @@ impl Tls13AeadAlgorithm for Tls13Gcm {
         // In the scenarios that GcmExpandKey would fail should result in a panic, ie: Not enough memory.
         Box::new(Tls13GcmState {
             key: GcmExpandedKey::new(key.as_ref(), BlockCipherType::AesBlock).unwrap(),
-            iv: iv,
+            iv,
         })
     }
 
@@ -219,7 +219,7 @@ impl Tls13AeadAlgorithm for Tls13Gcm {
         // In the scenarios that GcmExpandKey would fail should result in a panic, ie: Not enough memory.
         Box::new(Tls13GcmState {
             key: GcmExpandedKey::new(key.as_ref(), BlockCipherType::AesBlock).unwrap(),
-            iv: iv,
+            iv,
         })
     }
 
@@ -329,9 +329,9 @@ impl MessageDecrypter for Tls13GcmState {
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
                     "SymCryptError: {}",
-                    symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
+                    symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
                 );
-                return Err(rustls::Error::General(custom_error_message));
+                Err(rustls::Error::General(custom_error_message))
             }
         }
     }
