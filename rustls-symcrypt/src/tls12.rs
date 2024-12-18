@@ -6,7 +6,7 @@ use rustls::crypto::cipher::{
     PrefixedPayload, Tls12AeadAlgorithm, UnsupportedOperationError,
 };
 use rustls::{ConnectionTrafficSecrets, Error};
-use symcrypt::block_ciphers::BlockCipherType;
+use symcrypt::cipher::BlockCipherType;
 
 use symcrypt::gcm::GcmExpandedKey;
 const GCM_FULL_NONCE_LENGTH: usize = 12;
@@ -131,9 +131,9 @@ impl MessageEncrypter for Tls12ChaCha20Poly1305 {
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
                     "SymCryptError: {}",
-                    symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller.
+                    symcrypt_error // Using general error to propagate the SymCrypt error back to the caller.
                 );
-                return Err(Error::General(custom_error_message));
+                Err(Error::General(custom_error_message))
             }
         }
     }
@@ -184,9 +184,9 @@ impl MessageDecrypter for Tls12ChaCha20Poly1305 {
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
                     "SymCryptError: {}",
-                    symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
+                    symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
                 );
-                return Err(Error::General(custom_error_message));
+                Err(Error::General(custom_error_message))
             }
         }
     }
@@ -230,7 +230,7 @@ impl Tls12AeadAlgorithm for Tls12Gcm {
         // In the scenarios that GcmExpandKey would fail should result in a panic, ie: Not enough memory.
         Box::new(Gcm12Encrypt {
             key: GcmExpandedKey::new(key.as_ref(), BlockCipherType::AesBlock).unwrap(),
-            full_iv: full_iv,
+            full_iv,
         })
     }
 
@@ -267,11 +267,11 @@ impl Tls12AeadAlgorithm for Tls12Gcm {
 
         match self.algo_type.key_size() {
             16 => Ok(ConnectionTrafficSecrets::Aes128Gcm {
-                key: key,
+                key,
                 iv: Iv::new(gcm_iv),
             }),
             32 => Ok(ConnectionTrafficSecrets::Aes256Gcm {
-                key: key,
+                key,
                 iv: Iv::new(gcm_iv),
             }),
             _ => Err(UnsupportedOperationError),
@@ -380,9 +380,9 @@ impl MessageDecrypter for Gcm12Decrypt {
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
                     "SymCryptError: {}",
-                    symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
+                    symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
                 );
-                return Err(Error::General(custom_error_message));
+                Err(Error::General(custom_error_message))
             }
         }
     }

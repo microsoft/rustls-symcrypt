@@ -13,9 +13,16 @@ use rustls_pemfile;
 
 use rustls_symcrypt::{
     custom_symcrypt_provider, default_symcrypt_provider, SECP256R1, SECP384R1,
-    TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256,
-    TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-    TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, X25519,
+    TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+};
+
+#[cfg(feature = "x25519")]
+use rustls_symcrypt::X25519;
+
+#[cfg(feature = "chacha")]
+use rustls_symcrypt::{
+    TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 };
 
 static TEST_CERT_PATH: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::new(|| {
@@ -25,16 +32,15 @@ static TEST_CERT_PATH: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::n
     path
 });
 
-// Note: must run with feature flags enabled Ie:
-// cargo test --features x25519,chacha
+struct OpenSSLServer(Child);
 
-// Make test function that accepts an array for both
+impl Drop for OpenSSLServer {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+    }
+}
 
-// Test assumes user has openssl on the machine and is in the PATH.
-fn start_openssl_server() -> Child {
-    // Spawn openssl server
-    // openssl s_server -accept 4443 -cert localhost.crt  -key localhost.key -debug
-
+fn start_openssl_server() -> OpenSSLServer {
     let cert_path = TEST_CERT_PATH
         .join("localhost.pem")
         .into_os_string()
@@ -46,7 +52,7 @@ fn start_openssl_server() -> Child {
         .into_string()
         .unwrap();
 
-    Command::new("openssl")
+    let child = Command::new("openssl")
         .arg("s_server")
         .arg("-accept")
         .arg("4443")
@@ -54,10 +60,12 @@ fn start_openssl_server() -> Child {
         .arg(cert_path)
         .arg("-key")
         .arg(key_path)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null()) // Suppress standard output
+        .stderr(std::process::Stdio::null()) // Suppress standard error
         .spawn()
-        .expect("Failed to start OpenSSL server.")
+        .expect("Failed to start OpenSSL server.");
+
+    OpenSSLServer(child)
 }
 
 fn test_with_config(
@@ -73,7 +81,7 @@ fn test_with_config(
     };
 
     let cert_path = TEST_CERT_PATH
-        .join("RootCa.pem")
+        .join("RootCA.pem")
         .into_os_string()
         .into_string()
         .unwrap();
@@ -121,6 +129,7 @@ fn test_with_config(
     ciphersuite.suite()
 }
 
+#[cfg(any(feature = "x25519", feature = "chacha"))]
 fn test_with_custom_config_to_internet(
     suite: SupportedCipherSuite,
     group: &'static dyn SupportedKxGroup,
@@ -179,13 +188,14 @@ fn test_tls13_aes_128_256() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_AES_128_GCM_SHA256, SECP384R1);
     assert_eq!(expected_suite, CipherSuite::TLS13_AES_128_GCM_SHA256);
@@ -200,19 +210,21 @@ fn test_tls13_aes_256_384() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_AES_256_GCM_SHA384, SECP256R1);
     assert_eq!(expected_suite, CipherSuite::TLS13_AES_256_GCM_SHA384);
     drop(server_thread);
 }
 
+#[cfg(feature = "chacha")]
 #[test]
 fn test_tls13_chacha_1305() {
     let server_thread = {
@@ -221,13 +233,14 @@ fn test_tls13_chacha_1305() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_CHACHA20_POLY1305_SHA256, SECP256R1);
     assert_eq!(expected_suite, CipherSuite::TLS13_CHACHA20_POLY1305_SHA256);
@@ -244,13 +257,14 @@ fn test_tls12_rsa_256_384() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, SECP256R1);
     assert_eq!(
@@ -268,13 +282,14 @@ fn test_tls12_rsa_128_256() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, SECP256R1);
     assert_eq!(
@@ -284,6 +299,7 @@ fn test_tls12_rsa_128_256() {
     drop(server_thread);
 }
 
+#[cfg(feature = "x25519")]
 #[test]
 fn test_tls13_256_384_with_25519() {
     let server_thread = {
@@ -292,13 +308,14 @@ fn test_tls13_256_384_with_25519() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_AES_256_GCM_SHA384, X25519);
     assert_eq!(expected_suite, CipherSuite::TLS13_AES_256_GCM_SHA384);
@@ -313,13 +330,14 @@ fn test_tls13_256_384_with_nist384() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_AES_256_GCM_SHA384, SECP384R1);
     assert_eq!(expected_suite, CipherSuite::TLS13_AES_256_GCM_SHA384);
@@ -327,6 +345,7 @@ fn test_tls13_256_384_with_nist384() {
 }
 
 // Test TLS connection to internet
+#[cfg(feature = "chacha")]
 #[test]
 fn test_chacha_to_internet() {
     let expected_suite =
@@ -346,13 +365,14 @@ fn test_default_client() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     // Add default webpki roots to the root store
     let mut root_store = rustls::RootCertStore {
@@ -360,7 +380,7 @@ fn test_default_client() {
     };
 
     let cert_path = TEST_CERT_PATH
-        .join("RootCa.pem")
+        .join("RootCA.pem")
         .into_os_string()
         .into_string()
         .unwrap();

@@ -70,7 +70,8 @@ impl SupportedKxGroup for KxGroup {
     fn start(&self) -> Result<Box<(dyn ActiveKeyExchange)>, Error> {
         let ec_key = EcKey::generate_key_pair(self.curve_type, EcKeyUsage::EcDh)
             .map_err(|e| Error::General(format!("SymCrypt key generation failed: {:?}", e)))?;
-        let mut pub_key = ec_key.export_public_key()
+        let mut pub_key = ec_key
+            .export_public_key()
             .map_err(|e| Error::General(format!("SymCrypt public key export failed: {:?}", e)))?;
 
         // Based on RFC 8446 https://www.rfc-editor.org/rfc/rfc8446#section-4.2.8.2.
@@ -94,7 +95,9 @@ impl SupportedKxGroup for KxGroup {
 
             // Not possible to reach this branch since NistP521 struct is not implemented for key exchange
             CurveType::NistP521 => {
-                return Err(Error::General("NistP521 is not supported for key exchange".to_string()));
+                return Err(Error::General(
+                    "NistP521 is not supported for key exchange".to_string(),
+                ));
             }
         }
 
@@ -102,7 +105,7 @@ impl SupportedKxGroup for KxGroup {
             state: ec_key,
             name: self.name,
             curve_type: self.curve_type,
-            pub_key: pub_key,
+            pub_key,
         }))
     }
 
@@ -148,17 +151,19 @@ impl ActiveKeyExchange for KeyExchange {
             }
 
             CurveType::NistP521 => {
-                return Err(Error::General("NistP521 is not supported for key exchange".to_string()));
+                return Err(Error::General(
+                    "NistP521 is not supported for key exchange".to_string(),
+                ));
             }
         };
 
         let peer_ecdh =
-            match EcKey::set_public_key(self.curve_type, &new_peer_pub_key, EcKeyUsage::EcDh) {
+            match EcKey::set_public_key(self.curve_type, new_peer_pub_key, EcKeyUsage::EcDh) {
                 Ok(peer_ecdh) => peer_ecdh,
                 Err(symcrypt_error) => {
                     let custom_error_message = format!(
                         "SymCryptError: {}",
-                        symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
+                        symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
                     );
                     return Err(Error::General(custom_error_message));
                 }
@@ -169,7 +174,7 @@ impl ActiveKeyExchange for KeyExchange {
             Err(symcrypt_error) => {
                 let custom_error_message = format!(
                     "SymCryptError: {}",
-                    symcrypt_error.to_string() // Using general error to propagate the SymCrypt error back to the caller
+                    symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
                 );
                 return Err(Error::General(custom_error_message));
             }
