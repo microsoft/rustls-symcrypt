@@ -13,9 +13,16 @@ use rustls_pemfile;
 
 use rustls_symcrypt::{
     custom_symcrypt_provider, default_symcrypt_provider, SECP256R1, SECP384R1,
-    TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256,
-    TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-    TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, X25519,
+    TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+};
+
+#[cfg(feature = "x25519")]
+use rustls_symcrypt::X25519;
+
+#[cfg(feature = "chacha")]
+use rustls_symcrypt::{
+    TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 };
 
 static TEST_CERT_PATH: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::new(|| {
@@ -27,8 +34,6 @@ static TEST_CERT_PATH: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::n
 
 // Note: must run with feature flags enabled Ie:
 // cargo test --features x25519,chacha
-
-// Make test function that accepts an array for both
 
 // Test assumes user has openssl on the machine and is in the PATH.
 fn start_openssl_server() -> Child {
@@ -185,7 +190,7 @@ fn test_tls13_aes_128_256() {
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_AES_128_GCM_SHA256, SECP384R1);
     assert_eq!(expected_suite, CipherSuite::TLS13_AES_128_GCM_SHA256);
@@ -206,13 +211,14 @@ fn test_tls13_aes_256_384() {
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_AES_256_GCM_SHA384, SECP256R1);
     assert_eq!(expected_suite, CipherSuite::TLS13_AES_256_GCM_SHA384);
     drop(server_thread);
 }
 
+#[cfg(feature = "chacha")]
 #[test]
 fn test_tls13_chacha_1305() {
     let server_thread = {
@@ -227,7 +233,7 @@ fn test_tls13_chacha_1305() {
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_CHACHA20_POLY1305_SHA256, SECP256R1);
     assert_eq!(expected_suite, CipherSuite::TLS13_CHACHA20_POLY1305_SHA256);
@@ -250,7 +256,7 @@ fn test_tls12_rsa_256_384() {
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, SECP256R1);
     assert_eq!(
@@ -274,7 +280,7 @@ fn test_tls12_rsa_128_256() {
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, SECP256R1);
     assert_eq!(
@@ -284,6 +290,7 @@ fn test_tls12_rsa_128_256() {
     drop(server_thread);
 }
 
+#[cfg(feature = "x25519")]
 #[test]
 fn test_tls13_256_384_with_25519() {
     let server_thread = {
@@ -298,7 +305,7 @@ fn test_tls13_256_384_with_25519() {
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_AES_256_GCM_SHA384, X25519);
     assert_eq!(expected_suite, CipherSuite::TLS13_AES_256_GCM_SHA384);
@@ -319,7 +326,7 @@ fn test_tls13_256_384_with_nist384() {
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     let expected_suite = test_with_config(TLS13_AES_256_GCM_SHA384, SECP384R1);
     assert_eq!(expected_suite, CipherSuite::TLS13_AES_256_GCM_SHA384);
@@ -327,6 +334,7 @@ fn test_tls13_256_384_with_nist384() {
 }
 
 // Test TLS connection to internet
+#[cfg(feature = "chacha")]
 #[test]
 fn test_chacha_to_internet() {
     let expected_suite =
@@ -352,7 +360,7 @@ fn test_default_client() {
     };
 
     // Wait for the server to start
-    thread::sleep(std::time::Duration::from_secs(1));
+    thread::sleep(std::time::Duration::from_secs(5));
 
     // Add default webpki roots to the root store
     let mut root_store = rustls::RootCertStore {

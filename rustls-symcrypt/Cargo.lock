@@ -290,7 +290,7 @@ checksum = "16f1201b3c9a7ee8039bcadc17b7e605e2945b27eee7631788c1bd2b0643674b"
 
 [[package]]
 name = "rustls-symcrypt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "der",
  "env_logger",
@@ -360,7 +360,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "symcrypt"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "lazy_static",
  "libc",
@@ -369,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "symcrypt-sys"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "libc",
 ]
