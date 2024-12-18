@@ -32,14 +32,15 @@ static TEST_CERT_PATH: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::n
     path
 });
 
-// Note: must run with feature flags enabled Ie:
-// cargo test --features x25519,chacha
+struct OpenSSLServer(Child);
 
-// Test assumes user has openssl on the machine and is in the PATH.
-fn start_openssl_server() -> Child {
-    // Spawn openssl server
-    // openssl s_server -accept 4443 -cert localhost.crt  -key localhost.key -debug
+impl Drop for OpenSSLServer {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+    }
+}
 
+fn start_openssl_server() -> OpenSSLServer {
     let cert_path = TEST_CERT_PATH
         .join("localhost.pem")
         .into_os_string()
@@ -51,7 +52,7 @@ fn start_openssl_server() -> Child {
         .into_string()
         .unwrap();
 
-    Command::new("openssl")
+    let child = Command::new("openssl")
         .arg("s_server")
         .arg("-accept")
         .arg("4443")
@@ -59,10 +60,12 @@ fn start_openssl_server() -> Child {
         .arg(cert_path)
         .arg("-key")
         .arg(key_path)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null()) // Suppress standard output
+        .stderr(std::process::Stdio::null()) // Suppress standard error
         .spawn()
-        .expect("Failed to start OpenSSL server.")
+        .expect("Failed to start OpenSSL server.");
+
+    OpenSSLServer(child)
 }
 
 fn test_with_config(
@@ -78,7 +81,7 @@ fn test_with_config(
     };
 
     let cert_path = TEST_CERT_PATH
-        .join("RootCa.pem")
+        .join("RootCA.pem")
         .into_os_string()
         .into_string()
         .unwrap();
@@ -126,6 +129,7 @@ fn test_with_config(
     ciphersuite.suite()
 }
 
+#[cfg(any(feature = "x25519", feature = "chacha"))]
 fn test_with_custom_config_to_internet(
     suite: SupportedCipherSuite,
     group: &'static dyn SupportedKxGroup,
@@ -184,6 +188,7 @@ fn test_tls13_aes_128_256() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
@@ -205,6 +210,7 @@ fn test_tls13_aes_256_384() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
@@ -227,6 +233,7 @@ fn test_tls13_chacha_1305() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
@@ -250,6 +257,7 @@ fn test_tls12_rsa_256_384() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
@@ -274,6 +282,7 @@ fn test_tls12_rsa_128_256() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
@@ -299,6 +308,7 @@ fn test_tls13_256_384_with_25519() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
@@ -320,6 +330,7 @@ fn test_tls13_256_384_with_nist384() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
@@ -354,6 +365,7 @@ fn test_default_client() {
             openssl_server
                 .lock()
                 .unwrap()
+                .0
                 .wait()
                 .expect("OpenSSL server crashed unexpectedly");
         })
@@ -368,7 +380,7 @@ fn test_default_client() {
     };
 
     let cert_path = TEST_CERT_PATH
-        .join("RootCa.pem")
+        .join("RootCA.pem")
         .into_os_string()
         .into_string()
         .unwrap();
