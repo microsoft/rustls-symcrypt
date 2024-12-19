@@ -1,8 +1,9 @@
-// This code demonstrates a simple client-server application using Rust and the rustls library for TLS communication. 
-// The server uses a cached server certificate resolver, and the client uses a custom client certificate resolver. 
-// Both the client and server retrieve certificates from the "CurrentUser" "my" store.
-// use "certutil -store -user My" to get sha1 value of one certificate in my store and replace the hex_thumbprint.
-// usage: cargo run --bin test_client_server
+/// This program provides a simple client-server application using rustls-symcrypt and rustls-cng.
+/// It uses rustls-platform-verifier to utilize your machine's certificate validation for TLS communication.
+/// Both the client and server retrieve certificates from the "CurrentUser" "my" store.
+/// Please install rustls-client.pfx and rustls-server.pfx if you want to test it.
+/// Usage: cargo run --bin test_client_server
+//  The reference for this program is https://github.com/rustls/rustls-cng/blob/dev/tests/test_client_server.rs
 
 mod client {
 
@@ -11,19 +12,19 @@ mod client {
         net::{Shutdown, TcpStream},
         sync::Arc,
     };
-  
+
+    use anyhow::Result;
     use rustls::{
         client::ResolvesClientCert, sign::CertifiedKey, ClientConfig, ClientConnection,
         SignatureScheme, Stream,
     };
-    use rustls_pki_types::CertificateDer;
-    use rustls_platform_verifier::Verifier;
-    use rustls_symcrypt::default_symcrypt_provider;
     use rustls_cng::{
         signer::CngSigningKey,
         store::{CertStore, CertStoreType},
     };
-    use anyhow::Result;
+    use rustls_pki_types::CertificateDer;
+    use rustls_platform_verifier::Verifier;
+    use rustls_symcrypt::default_symcrypt_provider;
 
     #[derive(Debug)]
     pub struct ClientCertResolver(String);
@@ -71,23 +72,27 @@ mod client {
     }
 
     pub fn run_client(port: u16) -> Result<()> {
-        let hex_thumbprint = "1b2aa0272fb5ddcfdca3027e478a762fc34ab89d";
+        let hex_thumbprint = "a508d75eac3f646de59e406a5382ae2a40037d97";
 
-        let client_config = ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
-            .with_safe_default_protocol_versions()?
-            .dangerous()
-            .with_custom_certificate_verifier(Arc::new(
-                Verifier::new().with_provider(Arc::new(default_symcrypt_provider())),
-            ))
-            .with_client_cert_resolver(Arc::new(ClientCertResolver(hex_thumbprint.to_string())));
-     
+        let client_config =
+            ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
+                .with_safe_default_protocol_versions()?
+                .dangerous()
+                .with_custom_certificate_verifier(Arc::new(
+                    Verifier::new().with_provider(Arc::new(default_symcrypt_provider())),
+                ))
+                .with_client_cert_resolver(Arc::new(ClientCertResolver(
+                    hex_thumbprint.to_string(),
+                )));
+
         let mut connection =
             ClientConnection::new(Arc::new(client_config), "rustls-server".try_into()?)?;
-
+        println!("start a new connection");
         let mut client = TcpStream::connect(format!("localhost:{}", port))?;
-
         let mut tls_stream = Stream::new(&mut connection, &mut client);
+        println!("write to tls stream");
         tls_stream.write_all(b"ping")?;
+        println!("shut down socket");
         tls_stream.sock.shutdown(Shutdown::Write)?;
 
         let mut buf = [0u8; 4];
@@ -107,12 +112,12 @@ mod server {
         sync::{mpsc::Sender, Arc},
     };
 
+    use anyhow::Result;
     use rustls::{
         server::{ClientHello, ResolvesServerCert, ServerConfig, ServerConnection},
         sign::CertifiedKey,
         Stream,
     };
-    use anyhow::Result;
     use rustls_cng::{
         signer::CngSigningKey,
         store::{CertStore, CertStoreType},
@@ -140,11 +145,15 @@ mod server {
     }
 
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
-        let store = CertStore::open(CertStoreType::CurrentUser, "my")?;
+        let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
 
-        let context = store.find_by_sha1(thumbprint).unwrap().into_iter().next()
-                                        .ok_or_else(|| anyhow::Error::msg("Server: No client certificate found"))?;
+        let context = store
+            .find_by_sha1(thumbprint)
+            .unwrap()
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::Error::msg("Server: No client certificate found"))?;
         let key = context.acquire_key()?;
         let signing_key = CngSigningKey::new(key)?;
 
@@ -171,34 +180,32 @@ mod server {
     }
 
     pub fn run_server(sender: Sender<u16>) -> Result<()> {
-        let hex_thumbprint = "1b2aa0272fb5ddcfdca3027e478a762fc34ab89d";
+        let hex_thumbprint = "7772f5739ffab1777c83f158d44bba49e84b5b54";
         let (chain, signing_key) = get_chain(hex_thumbprint)?;
-        eprintln!("Megan: get_chain done");
         // Build the server configuration
         let server_config = ServerConfig::builder()
             .with_no_client_auth()
             .with_cert_resolver(Arc::new(CachedServerCertResolver::new(chain, signing_key)));
 
-        eprintln!("Megan: Set server_config");
         let server = TcpListener::bind("127.0.0.1:0")?;
         let _ = sender.send(server.local_addr()?.port());
         let stream = server.incoming().next().unwrap()?;
         let config = Arc::new(server_config);
         handle_connection(stream, config)?;
-        println!("Server is running.");
+
         Ok(())
     }
 }
 
 fn main() -> anyhow::Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
- 
+
     std::thread::spawn(move || {
         if let Err(e) = server::run_server(tx) {
             eprintln!("Server error: {:?}", e);
         }
     });
-
+    println!("Server is running");
     if let Ok(port) = rx.recv() {
         if let Err(e) = client::run_client(port) {
             eprintln!("Client error: {:?}", e);
