@@ -13,7 +13,8 @@ use rustls_pemfile;
 
 use rustls_symcrypt::{
     custom_symcrypt_provider, default_symcrypt_provider, SECP256R1, SECP384R1,
-    TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+    TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+    TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
     TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 };
 
@@ -22,7 +23,8 @@ use rustls_symcrypt::X25519;
 
 #[cfg(feature = "chacha")]
 use rustls_symcrypt::{
-    TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+    TLS13_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+    TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 };
 
 static TEST_CERT_PATH: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::new(|| {
@@ -129,10 +131,10 @@ fn test_with_config(
     ciphersuite.suite()
 }
 
-#[cfg(any(feature = "x25519", feature = "chacha"))]
 fn test_with_custom_config_to_internet(
     suite: SupportedCipherSuite,
     group: &'static dyn SupportedKxGroup,
+    host_name: String,
 ) -> CipherSuite {
     let cipher_suites = vec![suite];
     let kx_group = vec![group];
@@ -151,18 +153,20 @@ fn test_with_custom_config_to_internet(
     .with_root_certificates(root_store)
     .with_no_client_auth();
 
-    let server_name = "www.rust-lang.org".try_into().unwrap();
-    let mut sock = TcpStream::connect("www.rust-lang.org:443").unwrap();
+    let server_name = host_name.clone().try_into().unwrap();
+    let addr = format!("{}:443", host_name);
+    let mut sock = TcpStream::connect(&addr).unwrap();
 
     let mut conn = rustls::ClientConnection::new(Arc::new(config), server_name).unwrap();
     let mut tls = rustls::Stream::new(&mut conn, &mut sock);
     tls.write_all(
-        concat!(
-            "GET / HTTP/1.1\r\n",
-            "Host: rust-lang.org\r\n",
-            "Connection: close\r\n",
-            "Accept-Encoding: identity\r\n",
-            "\r\n"
+        format!(
+            "GET / HTTP/1.1\r\n\
+            Host: {}\r\n\
+            Connection: close\r\n\
+            Accept-Encoding: identity\r\n\
+            \r\n",
+            host_name
         )
         .as_bytes(),
     )
@@ -348,11 +352,80 @@ fn test_tls13_256_384_with_nist384() {
 #[cfg(feature = "chacha")]
 #[test]
 fn test_chacha_to_internet() {
-    let expected_suite =
-        test_with_custom_config_to_internet(TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, SECP384R1);
+    let expected_suite = test_with_custom_config_to_internet(
+        TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+        SECP384R1,
+        "www.rust-lang.org".to_string(),
+    );
     assert_eq!(
         expected_suite,
         CipherSuite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+    );
+}
+
+#[test]
+fn test_tls12_rsa_128_256_to_internet() {
+    let expected_suite = test_with_custom_config_to_internet(
+        TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+        SECP256R1,
+        "www.rust-lang.org".to_string(),
+    );
+    assert_eq!(
+        expected_suite,
+        CipherSuite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+    );
+}
+
+#[test]
+fn test_tls12_rsa_256_384_to_internet() {
+    let expected_suite = test_with_custom_config_to_internet(
+        TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+        SECP384R1,
+        "rust-lang.org".to_string(),
+    );
+    assert_eq!(
+        expected_suite,
+        CipherSuite::TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    );
+}
+
+#[test]
+fn test_tls12_ecdsa_128_256_to_internet() {
+    let expected_suite = test_with_custom_config_to_internet(
+        TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+        SECP256R1,
+        "www.ssl.org".to_string(),
+    );
+    assert_eq!(
+        expected_suite,
+        CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+    );
+}
+
+#[test]
+fn test_tls12_ecdsa_256_384_to_internet() {
+    let expected_suite = test_with_custom_config_to_internet(
+        TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+        SECP256R1,
+        "www.ssl.org".to_string(),
+    );
+    assert_eq!(
+        expected_suite,
+        CipherSuite::TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+    );
+}
+
+#[test]
+#[cfg(feature = "chacha")]
+fn test_tls12_ecdsa_poly_1305_to_internet() {
+    let expected_suite = test_with_custom_config_to_internet(
+        TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+        SECP256R1,
+        "www.ssl.org".to_string(),
+    );
+    assert_eq!(
+        expected_suite,
+        CipherSuite::TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
     );
 }
 
