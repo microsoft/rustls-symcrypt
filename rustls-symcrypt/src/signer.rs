@@ -13,7 +13,6 @@ use symcrypt::{
 use pkcs1::der::Decode;
 use pkcs1::RsaPrivateKey;
 use pkcs8::PrivateKeyInfo;
-use sec1::der::Decodable;
 use sec1::EcPrivateKey;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -95,7 +94,7 @@ impl RsaSigningKey {
                 // Parse the DER-encoded private key
                 let private_key_info = PrivateKeyInfo::from_der(private_key_blob)
                     .map_err(|_| Error::General("Failed to parse PKCS#8 DER".into()))?;
-                let private_key = RsaPrivateKey::from_der(&private_key_info.private_key)
+                let private_key = RsaPrivateKey::from_der(private_key_info.private_key)
                     .map_err(|_| Error::General("Failed to parse PKCS#8 DER".into()))?;
 
                 // Extract the components and set the key pair
@@ -197,11 +196,9 @@ impl Signer for RsaSigner {
                     Err(e) => Err(Error::General(format!("failed to sign message: {}", e))),
                 }
             }
-            _ => {
-                return Err(Error::General(
-                    "unsupported RSA-PKCS1 signature scheme".into(),
-                ));
-            }
+            _ => Err(Error::General(
+                "unsupported RSA-PKCS1 signature scheme".into(),
+            )),
         }
     }
 
@@ -239,13 +236,8 @@ impl EcdsaSigningKey {
                     .map_err(|_| Error::General("Failed to parse SEC1 DER".into()))?;
 
                 // Use EcPrivateKey's private_key to set up the ECDSA key
-                EcKey::set_key_pair(
-                    curve_type,
-                    &private_key.private_key,
-                    None,
-                    EcKeyUsage::EcDsa,
-                )
-                .map_err(|_| Error::General("Failed to set ECDSA key from SEC1".into()))?
+                EcKey::set_key_pair(curve_type, private_key.private_key, None, EcKeyUsage::EcDsa)
+                    .map_err(|_| Error::General("Failed to set ECDSA key from SEC1".into()))?
             }
             PrivateKeyDer::Pkcs8(pkcs8) => {
                 // Extract DER-encoded private key blob for PKCS#8
@@ -262,17 +254,12 @@ impl EcdsaSigningKey {
                 };
 
                 // Parse the PKCS#8 DER-encoded EC private key
-                let private_key = EcPrivateKey::from_der(&private_key_info.private_key)
+                let private_key = EcPrivateKey::from_der(private_key_info.private_key)
                     .map_err(|_| Error::General("Failed to parse PKCS#8 DER".into()))?;
 
                 // Use EcPrivateKey's private_key to set up the ECDSA key
-                EcKey::set_key_pair(
-                    curve_type,
-                    &private_key.private_key,
-                    None,
-                    EcKeyUsage::EcDsa,
-                )
-                .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#8".into()))?
+                EcKey::set_key_pair(curve_type, private_key.private_key, None, EcKeyUsage::EcDsa)
+                    .map_err(|_| Error::General("Failed to set ECDSA key from PKCS#8".into()))?
             }
             _ => {
                 return Err(Error::General(
@@ -353,8 +340,8 @@ impl Signer for EcdsaSigner {
         };
 
         let ec_sig_data = ECSignatureData {
-            modulus,  // r
-            public_exponent,  // s
+            modulus,         // r
+            public_exponent, // s
         };
 
         // Step 5: Encode the RsaPublicKey using the Encode trait
