@@ -23,7 +23,10 @@ fn extract_rsa_public_key(pub_key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), InvalidS
 
 // NistP256, NistP384, and NistP521 have a prepended Legacy byte that needs to be removed.
 // This call will return InvalidSignature if the public key is P256, P384, or P21 and does not have the legacy byte.
-fn extract_ecc_public_key(pub_key: &[u8], curve_type: CurveType) -> Result<Vec<u8>, InvalidSignature> {
+fn extract_ecc_public_key(
+    pub_key: &[u8],
+    curve_type: CurveType,
+) -> Result<Vec<u8>, InvalidSignature> {
     match curve_type {
         CurveType::NistP256 | CurveType::NistP384 | CurveType::NistP521 => {
             if pub_key.starts_with(&[0x04]) {
@@ -33,7 +36,8 @@ fn extract_ecc_public_key(pub_key: &[u8], curve_type: CurveType) -> Result<Vec<u
             }
         }
         CurveType::Curve25519 => {
-            Ok(pub_key[..].to_vec())
+            // Curve25519 is not supported for ECC signatures
+            Err(InvalidSignature)
         }
     }
 }
@@ -46,20 +50,20 @@ fn extract_ecc_public_key(pub_key: &[u8], curve_type: CurveType) -> Result<Vec<u
 /// SymCrypt expects a concatenated r+s with leading padding and leading 0's for both r and s to be removed
 fn extract_ecc_signature(signature: &[u8], curve: CurveType) -> Result<Vec<u8>, InvalidSignature> {
     // We use pkcs1::RsaPublicKey because the underlying ASN1 format between an RSA public key and
-    // an ECC signgature is the same.
+    // an ECC signature is the same.
     let signature = AsnRsaPublicKey::try_from(signature).map_err(|_| InvalidSignature)?;
-    
+
     let component_length = curve.get_size() as usize;
-    
+
     // Leading 0's are stripped when using as_bytes()
     // https://docs.rs/pkcs1/0.7.5/pkcs1/struct.UintRef.html
     let r = signature.modulus.as_bytes(); // cast name from `modulus` to `r`
     let s = signature.public_exponent.as_bytes(); // cast name from `public_exponent` to `s`
 
-    // SymCrypt takes in a concatenated r+s. with the individual r and s components having a size of curve / 2. 
+    // SymCrypt takes in a concatenated r+s. with the individual r and s components having a size of curve / 2.
     // If for example the curve is P256, the r and s components must individually 32 bytes long.
     // as_bytes() removes all leading 0s, which covers the case if r or s is 33 bytes long for example.
-    // as_bytes() may remove ALL 0's even if one was randomly generated as part of the signature. 
+    // as_bytes() may remove ALL 0's even if one was randomly generated as part of the signature.
     // So after we remove the 0's we prepend 0's that were removed until the lengths are 32.
     // Majority of the time this will not happen but this is to cover corner cases where it does.
 
@@ -71,7 +75,7 @@ fn extract_ecc_signature(signature: &[u8], curve: CurveType) -> Result<Vec<u8>, 
     if r.len() > component_length || s.len() > component_length {
         return Err(InvalidSignature);
     }
-    
+
     // Prepend zeros if r is smaller than component_length.
     if r.len() < component_length {
         r_padded.extend(std::iter::repeat(0).take(component_length - r.len()));
@@ -103,8 +107,6 @@ pub static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgori
         RSA_PSS_SHA256,
         RSA_PSS_SHA384,
         RSA_PSS_SHA512,
-        #[cfg(feature = "x25519")]
-        ED25519,
     ],
     mapping: &[
         // Note: for TLS1.2 the curve is not fixed by SignatureScheme. For TLS1.3 it is.
@@ -116,12 +118,7 @@ pub static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgori
             SignatureScheme::ECDSA_NISTP256_SHA256,
             &[ECDSA_P256_SHA256, ECDSA_P384_SHA256, ECDSA_P521_SHA256],
         ),
-        (
-            SignatureScheme::ECDSA_NISTP521_SHA512,
-            &[ECDSA_P521_SHA512],
-        ),
-        #[cfg(feature = "x25519")]
-        (SignatureScheme::ED25519, &[ED25519]), // Disable by default
+        (SignatureScheme::ECDSA_NISTP521_SHA512, &[ECDSA_P521_SHA512]),
         (SignatureScheme::RSA_PSS_SHA512, &[RSA_PSS_SHA512]),
         (SignatureScheme::RSA_PSS_SHA384, &[RSA_PSS_SHA384]),
         (SignatureScheme::RSA_PSS_SHA256, &[RSA_PSS_SHA256]),
@@ -340,9 +337,10 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
 
                 // the signature will be in ASN.1 DER format, with separated `r` and `s` components, need to remove padding
                 // and concatenate the two components.
-                let sig = extract_ecc_signature(&signature, ecc.curve)?;
+                let sig = extract_ecc_signature(signature, ecc.curve)?;
 
-                let ec_key = EcKey::set_public_key(ecc.curve, &key, EcKeyUsage::EcDsa).map_err(|_| InvalidSignature)?;
+                let ec_key = EcKey::set_public_key(ecc.curve, &key, EcKeyUsage::EcDsa)
+                    .map_err(|_| InvalidSignature)?;
                 let hashed_message = (self.hasher)(message);
                 ec_key
                     .ecdsa_verify(&sig, &hashed_message)
@@ -351,9 +349,8 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
             KeyType::RsaPkcs1(rsa_pkcs1) => {
                 // extract the modulus and exponent from the public key
                 let (modulus, exponent) = extract_rsa_public_key(public_key)?;
-                let rsa_key =
-                    RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::Sign)
-                        .map_err(|_| InvalidSignature)?;
+                let rsa_key = RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::Sign)
+                    .map_err(|_| InvalidSignature)?;
                 let hashed_message = (self.hasher)(message);
                 rsa_key
                     .pkcs1_verify(&hashed_message, signature, rsa_pkcs1.hash_algorithm)
@@ -362,8 +359,7 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
             KeyType::RsaPss(rsa_pss) => {
                 // extract the modulus and exponent from the public key
                 let (modulus, exponent) = extract_rsa_public_key(public_key)?;
-                let rsa_key =
-                    RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::Sign)
+                let rsa_key = RsaKey::set_public_key(&modulus, &exponent, RsaKeyUsage::Sign)
                     .map_err(|_| InvalidSignature)?;
                 let hashed_message = (self.hasher)(message);
                 rsa_key
