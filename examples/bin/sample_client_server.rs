@@ -23,7 +23,7 @@ mod client {
         store::{CertStore, CertStoreType},
     };
     use rustls_pki_types::CertificateDer;
-    use rustls_platform_verifier::Verifier;
+    use rustls_platform_verifier::BuilderVerifierExt;
     use rustls_symcrypt::default_symcrypt_provider;
 
     #[derive(Debug)]
@@ -32,6 +32,7 @@ mod client {
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
+        // depend on version of rustls-cng that supports. can use find_by_sha256() when rustls-cng in new version
         let contexts = store.find_by_sha1(thumbprint)?;
         let context = contexts
             .first()
@@ -77,10 +78,7 @@ mod client {
         let client_config =
             ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
                 .with_safe_default_protocol_versions()?
-                .dangerous()
-                .with_custom_certificate_verifier(Arc::new(
-                    Verifier::new().with_provider(Arc::new(default_symcrypt_provider())),
-                ))
+                .with_platform_verifier()
                 .with_client_cert_resolver(Arc::new(ClientCertResolver(
                     hex_thumbprint.to_string(),
                 )));
@@ -147,7 +145,7 @@ mod server {
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
-
+        // depend on version of rustls-cng that supports. can use find_by_sha256() when rustls-cng in new version
         let context = store
             .find_by_sha1(thumbprint)
             .unwrap()
