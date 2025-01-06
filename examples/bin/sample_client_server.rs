@@ -32,12 +32,12 @@ mod client {
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
-        // depend on version of rustls-cng that supports. can use find_by_sha256() when rustls-cng in new version
-        let contexts = store.find_by_sha1(thumbprint)?;
+        
+        let contexts = store.find_by_sha256(thumbprint)?;
         let context = contexts
             .first()
             .ok_or_else(|| anyhow::Error::msg("Client: No client cert"))?;
-        let key = context.acquire_key()?;
+        let key = context.acquire_key(true)?;
         let signing_key = CngSigningKey::new(key)?;
         let chain = context
             .as_chain_der()?
@@ -73,7 +73,7 @@ mod client {
     }
 
     pub fn run_client(port: u16) -> Result<()> {
-        let hex_thumbprint = "a508d75eac3f646de59e406a5382ae2a40037d97";
+        let hex_thumbprint = "9e04c0715bb5f9d246c82a5dd841778f00137337f15c7e5f3444ddad975c789c";
 
         let client_config =
             ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
@@ -145,14 +145,14 @@ mod server {
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
-        // depend on version of rustls-cng that supports. can use find_by_sha256() when rustls-cng in new version
+        
         let context = store
-            .find_by_sha1(thumbprint)
+            .find_by_sha256(thumbprint)
             .unwrap()
             .into_iter()
             .next()
             .ok_or_else(|| anyhow::Error::msg("Server: No client certificate found"))?;
-        let key = context.acquire_key()?;
+        let key = context.acquire_key(true)?;
         let signing_key = CngSigningKey::new(key)?;
 
         let chain = context
@@ -178,7 +178,7 @@ mod server {
     }
 
     pub fn run_server(sender: Sender<u16>) -> Result<()> {
-        let hex_thumbprint = "7772f5739ffab1777c83f158d44bba49e84b5b54";
+        let hex_thumbprint = "04d6b562162923555c39d64cc6e5220fa0a7cf5a5a7720e6f3a8a34f976dc9e8";
         let (chain, signing_key) = get_chain(hex_thumbprint)?;
         // Build the server configuration
         let server_config = ServerConfig::builder()
