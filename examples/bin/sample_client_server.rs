@@ -2,7 +2,7 @@
 /// It uses rustls-platform-verifier to utilize your machine's certificate validation for TLS communication.
 /// Both the client and server retrieve certificates from the "CurrentUser" "my" store.
 /// Please install rustls-client.pfx and rustls-server.pfx if you want to test it.
-/// Usage: cargo run --bin test_client_server
+/// Usage: cargo run --bin sample_client_server
 //  The reference for this program is https://github.com/rustls/rustls-cng/blob/dev/tests/test_client_server.rs
 
 mod client {
