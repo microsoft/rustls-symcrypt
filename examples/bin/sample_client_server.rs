@@ -1,7 +1,7 @@
 /// This program provides a simple client-server application using rustls-symcrypt and rustls-cng.
 /// It uses rustls-platform-verifier to utilize your machine's certificate validation for TLS communication.
 /// Both the client and server retrieve certificates from the "CurrentUser" "my" store.
-// Please install rustls-client.pfx and rustls-server.pfx if you want to test it.
+// Please install rustls-client.pfx and rustls-server.pfx into "CurrentUser" "my" store if you want to test it. The password is "changeit"
 /// Usage: cargo run --bin sample_client_server
 //  The reference for this program is https://github.com/rustls/rustls-cng/blob/dev/tests/test_client_server.rs
 
@@ -27,13 +27,13 @@ mod client {
     use rustls_symcrypt::default_symcrypt_provider;
 
     #[derive(Debug)]
-    pub struct ClientCertResolver(String); 
-    
+    pub struct ClientCertResolver(String);
+
     //this is the SHA256 thumbprint of the certificate in the CurrentUser My store
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
-        
+
         let contexts = store.find_by_sha256(thumbprint)?;
         let context = contexts
             .first()
@@ -147,7 +147,7 @@ mod server {
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
-        
+
         let context = store
             .find_by_sha256(thumbprint)
             .unwrap()
