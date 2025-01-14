@@ -11,7 +11,7 @@ use std::sync::Arc;
 /// cargo run --bin sample_internet_client
 fn main() {
     let root_store = rustls::RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
 
     let config = rustls::ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
