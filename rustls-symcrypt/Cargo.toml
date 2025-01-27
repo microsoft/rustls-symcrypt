@@ -1,7 +1,7 @@
 [package]
 name = "rustls-symcrypt"
 authors = ["Microsoft"]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "Apache-2.0 OR ISC OR MIT"
 description = "Implementation of rustls crypto provider model for SymCrypt"
@@ -14,7 +14,7 @@ readme = "README.md"
 [dependencies]
 # Disable aws_ls_rc since it is not needed and increases build time.
 rustls = { version = "0.23.0", features = ["tls12", "std"], default-features = false }
-symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.5.0" }
+symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.5.1" }
 pkcs1 = { version = "0.7.5", features = ["alloc"], default-features = false }
 rustls-webpki = {version = "0.102.2", features = ["std"], default-features = false}
 pkcs8 = "0.10"
