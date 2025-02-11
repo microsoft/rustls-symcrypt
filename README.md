@@ -24,11 +24,10 @@ Add `rustls-symcrypt` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rustls = { version = "0.23.0", features = ["ring", "tls12", "std"], default-features = false }
-# Disabling aws-lc as it slows down build times and is not needed.
-rustls_symcrypt = "0.1.0"
+rustls = { version = "0.23.0", features = ["tls12", "std", "custom-provider"], default-features = false }
+rustls_symcrypt = "0.2.1"
 # To enable the chacha feature:
-# rustls_symcrypt = {version = "0.1.0", features = ["chacha"]}
+# rustls_symcrypt = {version = "0.2.1", features = ["chacha"]}
 ```
 
 ## Supported Ciphers

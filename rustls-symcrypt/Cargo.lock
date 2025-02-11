@@ -74,9 +74,9 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
 name = "cc"
-version = "1.2.2"
+version = "1.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f34d93e62b03caf570cccc334cbc6c2fceca82f39211051345108adcba3eebdc"
+checksum = "755717a7de9ec452bf7f3f1a3099085deabd7f2962b861dae91ecd7a365903d2"
 dependencies = [
  "shlex",
 ]
@@ -284,9 +284,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-pki-types"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f1201b3c9a7ee8039bcadc17b7e605e2945b27eee7631788c1bd2b0643674b"
+checksum = "917ce264624a4b4db1c364dcc35bfca9ded014d0a958cd47ad3e960e988ea51c"
 
 [[package]]
 name = "rustls-symcrypt"
@@ -301,7 +301,7 @@ dependencies = [
  "pkcs8",
  "rustls",
  "rustls-pemfile",
- "rustls-webpki",
+ "rustls-pki-types",
  "sec1",
  "symcrypt",
  "webpki-roots",
@@ -371,6 +371,7 @@ dependencies = [
 name = "symcrypt-sys"
 version = "0.4.0"
 dependencies = [
+ "cc",
  "libc",
 ]
 

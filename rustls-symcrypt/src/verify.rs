@@ -2,10 +2,10 @@ use pkcs1::RsaPublicKey as AsnRsaPublicKey;
 use rustls::crypto::WebPkiSupportedAlgorithms;
 use rustls::pki_types::{AlgorithmIdentifier, InvalidSignature, SignatureVerificationAlgorithm};
 use rustls::SignatureScheme;
+use rustls_pki_types::alg_id;
 use symcrypt::ecc::{CurveType, EcKey, EcKeyUsage};
 use symcrypt::hash::{sha256, sha384, sha512, HashAlgorithm};
 use symcrypt::rsa::{RsaKey, RsaKeyUsage};
-use webpki::alg_id::{self};
 
 /// Rsa signatures from the wire will come in the following ASN1 format:
 /// RSAPublicKey ::= SEQUENCE {
