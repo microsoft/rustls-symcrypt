@@ -5,7 +5,6 @@ use rustls::SignatureScheme;
 use symcrypt::ecc::{CurveType, EcKey, EcKeyUsage};
 use symcrypt::hash::{sha256, sha384, sha512, HashAlgorithm};
 use symcrypt::rsa::{RsaKey, RsaKeyUsage};
-//use webpki::alg_id::{self};
 use rustls_pki_types::alg_id;
 
 
