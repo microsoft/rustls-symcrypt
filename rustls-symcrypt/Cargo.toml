@@ -12,15 +12,13 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# Disable aws_ls_rc since it is not needed and increases build time.
-rustls = { version = "0.23.0", features = ["tls12", "std"], default-features = false }
+rustls = { version = "0.23.0", default-features = false, features = ["tls12", "std", "custom-provider"]}
 symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.5.1" }
+rustls-pki-types = "1.11.0"
 pkcs1 = { version = "0.7.5", features = ["alloc"], default-features = false }
-rustls-webpki = {version = "0.102.2", features = ["std"], default-features = false}
 pkcs8 = "0.10"
 sec1 = "0.7.0"
 der = "0.7.9"
-
 
 [features]
 default = []
