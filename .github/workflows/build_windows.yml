@@ -66,16 +66,18 @@ jobs:
     # - TODO: re-enable when static linking is ready.
     # - name: Run tests (Debug, dynamic)
     #   if: matrix.run-tests
-    #   run: cargo test --locked --verbose --all-features --target ${{ matrix.target }}
+    #   run: cargo test --workspace --exclude examples --locked --verbose --all-features --target ${{ matrix.target }}
 
     # - name: Run tests (Release, dynamic)
     #   if: matrix.run-tests
-    #   run: cargo test --release --locked --verbose --all-features --target ${{ matrix.target }}
+    #   run: cargo test --workspace --exclude examples --release --locked --verbose --all-features --target ${{ matrix.target }}
+
+    # Disabling examples for testing 
 
     - name: Run test (Debug, static)
       if: matrix.run-tests
-      run: cargo test --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --exclude examples
+      run: cargo test --workspace --exclude examples --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} 
 
     - name: Run test (Release, static)
       if: matrix.run-tests
-      run: cargo test --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --exclude examples
+      run: cargo test --workspace --exclude examples --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} 
