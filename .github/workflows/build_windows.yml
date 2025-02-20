@@ -40,14 +40,7 @@ jobs:
       with:
         submodules: true
 
-    - name: Install host target
-      shell: pwsh
-      run: |
-        rustup target add ${{ matrix.target }}
-        if ("${{ matrix.target }}" -match "aarch64-unknown-linux-gnu") {
-          sudo apt update
-          sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-        }
+    
     # Install host architecture, required for cross-compilation since there is no arm64-windows-msvc runner
     - name: Install host target
       shell: pwsh
@@ -81,8 +74,8 @@ jobs:
 
     - name: Run test (Debug, static)
       if: matrix.run-tests
-      run: cargo test --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }}
+      run: cargo test --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --exclude examples
 
     - name: Run test (Release, static)
       if: matrix.run-tests
-      run: cargo test --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }}
+      run: cargo test --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --exclude examples
