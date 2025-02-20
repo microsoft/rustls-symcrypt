@@ -23,6 +23,14 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
+      # Checkout rust-symcrypt in a separate directory
+      - name: Checkout rust-symcrypt
+        uses: actions/checkout@v4
+        with:
+          repository: "microsoft/rust-symcrypt"
+          path: "rust-symcrypt"
+          submodules: true  
+
       - name: Install Rust toolchain 
         uses: dtolnay/rust-toolchain@stable
         with:
