@@ -58,10 +58,10 @@ jobs:
           echo "PATH=$env:GITHUB_WORKSPACE\symcrypt\dll;$env:PATH" >> $env:GITHUB_ENV  
 
     - name: Debug build
-      run: cargo build --locked --verbose --target ${{ matrix.target }}
+      run: cargo build --workspace --exclude examples --locked --verbose --target ${{ matrix.target }}
     
     - name: Release build
-      run: cargo build --release --locked --verbose --target ${{ matrix.target }}
+      run: cargo build --workspace --exclude examples --release --locked --verbose --target ${{ matrix.target }}
 
     # - TODO: re-enable when static linking is ready.
     # - name: Run tests (Debug, dynamic)
