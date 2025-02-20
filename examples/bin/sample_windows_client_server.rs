@@ -5,6 +5,9 @@
 // Usage: cargo run --bin sample_client_server
 //  The reference for this program is https://github.com/rustls/rustls-cng/blob/dev/tests/test_client_server.rs
 
+// Disable file when not compiling on Windows
+#![cfg(windows)]
+
 mod client {
 
     use std::{
@@ -29,7 +32,7 @@ mod client {
     #[derive(Debug)]
     pub struct ClientCertResolver(String);
 
-    //this is the SHA256 thumbprint of the certificate in the CurrentUser My store
+    // This is the SHA256 thumbprint of the certificate in the CurrentUser My store
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
@@ -199,22 +202,18 @@ mod server {
 
 // This program relies on rustls-cng which is only applicable for Windows Devices
 fn main() -> anyhow::Result<()> {
-    #[cfg(target_os = "windows")]
-    {
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            if let Err(e) = server::run_server(tx) {
-                eprintln!("Server error: {:?}", e);
-            }
-        });
-        println!("Server is running");
-        if let Ok(port) = rx.recv() {
-            if let Err(e) = client::run_client(port) {
-                eprintln!("Client error: {:?}", e);
-            }
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        if let Err(e) = server::run_server(tx) {
+            eprintln!("Server error: {:?}", e);
+        }
+    });
+    println!("Server is running");
+    if let Ok(port) = rx.recv() {
+        if let Err(e) = client::run_client(port) {
+            eprintln!("Client error: {:?}", e);
         }
     }
 
-    // Return nothing for non-windows devices
     Ok(())
 }
