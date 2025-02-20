@@ -45,8 +45,9 @@ jobs:
           Invoke-WebRequest -Uri ${{ matrix.symcrypt }} -OutFile symcrypt.zip
           New-Item -ItemType Directory -Force -Path symcrypt
           Expand-Archive -Path symcrypt.zip -DestinationPath symcrypt
-          echo "$dir/symcrypt/dll" >> $env:GITHUB_PATH
-          echo "SYMCRYPT_LIB_PATH=$dir/symcrypt/dll" >> $env:GITHUB_ENV   
+          echo "$env:GITHUB_WORKSPACE\symcrypt\dll" >> $env:GITHUB_PATH
+          echo "SYMCRYPT_LIB_PATH=$env:GITHUB_WORKSPACE\symcrypt\dll" >> $env:GITHUB_ENV
+          echo "PATH=$env:GITHUB_WORKSPACE\symcrypt\dll;$env:PATH" >> $env:GITHUB_ENV  
 
     - name: Debug build
       run: cargo build --locked --verbose --target ${{ matrix.target }}
