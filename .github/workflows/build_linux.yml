@@ -15,16 +15,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - target: x86_64-pc-windows-msvc
-          os: windows-latest
-          runs-on: windows-latest
-          symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-windows-amd64-release-103.8.0-53be637d.zip"
+        - target: x86_64-unknown-linux-gnu
+          os: ubuntu-latest
+          runs-on: ubuntu-latest
+          symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-linux-generic-amd64-release-103.8.0-53be637.tar.gz"
           run-tests: true
-        - target: aarch64-pc-windows-msvc
-          os: windows-latest
-          runs-on: windows-latest
-          symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-windows-arm64-release-103.8.0-53be637d.zip"
-          run-tests: false # Windows doesn't support ARM64 emulation
+        - target: aarch64-unknown-linux-gnu
+          os: ubuntu-24.04
+          runs-on: [self-hosted, ARM64]
+          symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-linux-generic-arm64-release-103.8.0-53be637.tar.gz"
+          run-tests: true
+          
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.target }}    
     env:
@@ -39,14 +40,25 @@ jobs:
 
     - uses: Swatinem/rust-cache@v2
 
-    - name: Download SymCrypt and Set Environment Variables
+
+    - name: Install host target
       shell: pwsh
       run: |
-          Invoke-WebRequest -Uri ${{ matrix.symcrypt }} -OutFile symcrypt.zip
-          New-Item -ItemType Directory -Force -Path symcrypt
-          Expand-Archive -Path symcrypt.zip -DestinationPath symcrypt
-          echo "$dir/symcrypt/dll" >> $env:GITHUB_PATH
-          echo "SYMCRYPT_LIB_PATH=$dir/symcrypt/dll" >> $env:GITHUB_ENV   
+        rustup target add ${{ matrix.target }}
+        if ("${{ matrix.target }}" -match "aarch64-unknown-linux-gnu") {
+          sudo apt update
+          sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        }
+
+    # Download SymCrypt via PMC
+    - name: Install SymCrypt via PMC
+      shell: bash
+      run: |
+        curl -sSL -O https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+        sudo dpkg -i packages-microsoft-prod.deb
+        sudo apt-get update
+        sudo apt-get install -y symcrypt
+
 
     - name: Debug build
       run: cargo build --locked --verbose --target ${{ matrix.target }}
