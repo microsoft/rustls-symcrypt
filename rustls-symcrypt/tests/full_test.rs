@@ -183,9 +183,8 @@ fn test_with_custom_config_to_internet(
 
 // Test TLS 1.3 Cipher Suites
 
-#[cfg(test)]
-mod test {
-    use super::*;
+// mod test {
+//     use super::*;
 
     #[test]
     fn test_tls13_aes_128_256() {
@@ -503,4 +502,4 @@ mod test {
         assert_eq!(ciphersuite.suite(), CipherSuite::TLS13_AES_256_GCM_SHA384);
         drop(server_thread);
     }
-}
+//}
