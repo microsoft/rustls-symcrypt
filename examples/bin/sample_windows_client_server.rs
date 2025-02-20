@@ -5,7 +5,6 @@
 // Usage: cargo run --bin sample_client_server
 //  The reference for this program is https://github.com/rustls/rustls-cng/blob/dev/tests/test_client_server.rs
 
-#[cfg(target_os = "windows")]
 mod client {
 
     use std::{
@@ -105,7 +104,6 @@ mod client {
     }
 }
 
-#[cfg(target_os = "windows")]
 mod server {
     use std::{
         io::{Read, Write},
@@ -200,21 +198,23 @@ mod server {
 }
 
 // This program relies on rustls-cng which is only applicable for Windows Devices
-#[cfg(target_os = "windows")]
 fn main() -> anyhow::Result<()> {
-    let (tx, rx) = std::sync::mpsc::channel();
-
-    std::thread::spawn(move || {
-        if let Err(e) = server::run_server(tx) {
-            eprintln!("Server error: {:?}", e);
-        }
-    });
-    println!("Server is running");
-    if let Ok(port) = rx.recv() {
-        if let Err(e) = client::run_client(port) {
-            eprintln!("Client error: {:?}", e);
+    #[cfg(target_os = "windows")]
+    {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            if let Err(e) = server::run_server(tx) {
+                eprintln!("Server error: {:?}", e);
+            }
+        });
+        println!("Server is running");
+        if let Ok(port) = rx.recv() {
+            if let Err(e) = client::run_client(port) {
+                eprintln!("Client error: {:?}", e);
+            }
         }
     }
 
+    // Return nothing for non-windows devices
     Ok(())
 }
