@@ -22,7 +22,7 @@ jobs:
           run-tests: true
         - target: aarch64-unknown-linux-gnu
           os: ubuntu-24.04
-          runs-on: [self-hosted, ARM64]
+          runs-on: ubuntu-24.04-arm
           symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-linux-generic-arm64-release-103.8.0-53be637.tar.gz"
           run-tests: true
           
@@ -39,16 +39,6 @@ jobs:
         submodules: true
 
     - uses: Swatinem/rust-cache@v2
-
-
-    - name: Install host target
-      shell: pwsh
-      run: |
-        rustup target add ${{ matrix.target }}
-        if ("${{ matrix.target }}" -match "aarch64-unknown-linux-gnu") {
-          sudo apt update
-          sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-        }
 
     # Download SymCrypt via PMC
     - name: Install SymCrypt via PMC

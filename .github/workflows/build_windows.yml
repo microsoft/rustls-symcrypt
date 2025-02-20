@@ -30,6 +30,7 @@ jobs:
     env:
       CARGO_BUILD_TARGET: ${{ matrix.target }}
     
+
     steps:
     # Checkout rustls-symcrypt code
     - name: Checkout rustls-symcrypt
@@ -38,6 +39,12 @@ jobs:
         submodules: true
 
     - uses: Swatinem/rust-cache@v2
+
+    # Install host architecture, required for cross-compilation since there is no arm64-windows-msvc runner
+    - name: Install host target
+      shell: pwsh
+      run: |
+        rustup target add ${{ matrix.target }}
 
     - name: Download SymCrypt and Set Environment Variables
       shell: pwsh
