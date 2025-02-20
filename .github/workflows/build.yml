@@ -44,14 +44,6 @@ jobs:
       with:
         submodules: true
 
-    # Checkout rust-symcrypt in a separate directory
-    - name: Checkout rust-symcrypt
-      uses: actions/checkout@v4
-      with:
-        repository: "microsoft/rust-symcrypt"
-        path: "../rust-symcrypt/rust-symcrypt" # Account for relative path from rustls-symcrypt
-        submodules: true
-
     - name: Install host target
       shell: pwsh
       run: |
