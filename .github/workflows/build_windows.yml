@@ -32,14 +32,23 @@ jobs:
     
 
     steps:
+    - uses: Swatinem/rust-cache@v2
+
+
     # Checkout rustls-symcrypt code
     - name: Checkout rustls-symcrypt
       uses: actions/checkout@v4
       with:
         submodules: true
 
-    - uses: Swatinem/rust-cache@v2
-
+    - name: Install host target
+      shell: pwsh
+      run: |
+        rustup target add ${{ matrix.target }}
+        if ("${{ matrix.target }}" -match "aarch64-unknown-linux-gnu") {
+          sudo apt update
+          sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        }
     # Install host architecture, required for cross-compilation since there is no arm64-windows-msvc runner
     - name: Install host target
       shell: pwsh
