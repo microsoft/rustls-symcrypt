@@ -81,7 +81,6 @@ jobs:
 
     - name: Run test (Release, static)
       if: matrix.run-tests
-      run: 
+      run: |
         cd rustls-symcrypt/tests
         cargo test 
-        
