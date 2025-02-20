@@ -34,7 +34,6 @@ use symcrypt::hash::{sha256, sha384, HashState, Sha256State, Sha384State};
 //
 // `update()` appends data to the ShaXXXState in order to be hashed. This operation can be done multiple times.
 
-
 /// Structs related to Sha256
 pub struct Sha256;
 pub struct Sha256Context(Sha256State);
