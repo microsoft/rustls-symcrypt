@@ -4,3 +4,4 @@ rustls-symcrypt/lcov.info
 rustls-symcrypt/.vscode/settings.json
 rustls-symcrypt/target
 .vscode/
+/target
