@@ -21,7 +21,7 @@ jobs:
           symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-linux-generic-amd64-release-103.8.0-53be637.tar.gz"
           run-tests: true
         - target: aarch64-unknown-linux-gnu
-          os: ubuntu-24.04
+          os: ubuntu-24.04-arm
           runs-on: ubuntu-24.04-arm
           symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-linux-generic-arm64-release-103.8.0-53be637.tar.gz"
           run-tests: true
