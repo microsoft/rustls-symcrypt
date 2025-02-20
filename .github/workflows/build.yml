@@ -17,20 +17,24 @@ jobs:
         include:
         - target: x86_64-pc-windows-msvc
           os: windows-latest
+          runs-on: windows-latest
           symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-windows-amd64-release-103.8.0-53be637d.zip"
           run-tests: true
         - target: aarch64-pc-windows-msvc
           os: windows-latest
+          runs-on: windows-latest
           symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-windows-arm64-release-103.8.0-53be637d.zip"
           run-tests: false # Windows doesn't support ARM64 emulation
         - target: x86_64-unknown-linux-gnu
-          symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-linux-generic-amd64-release-103.8.0-53be637.tar.gz"
           os: ubuntu-latest
+          runs-on: ubuntu-latest
+          symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-linux-generic-amd64-release-103.8.0-53be637.tar.gz"
           run-tests: true
         - target: aarch64-unknown-linux-gnu
-          os: ubuntu-latest
+          os: ubuntu-24.04
+          runs-on: [self-hosted, ARM64]
           symcrypt: "https://github.com/microsoft/SymCrypt/releases/download/v103.8.0/symcrypt-linux-generic-arm64-release-103.8.0-53be637.tar.gz"
-          run-tests: false
+          run-tests: true
           
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.target }}    
