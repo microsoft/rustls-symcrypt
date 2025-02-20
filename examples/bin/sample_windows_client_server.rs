@@ -143,7 +143,7 @@ mod server {
         }
     }
 
-    //this is the SHA256 thumbprint of the certificate in the CurrentUser My store
+    // This is the SHA256 thumbprint of the certificate in the CurrentUser My store
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
@@ -197,8 +197,11 @@ mod server {
     }
 }
 
+
+// This program relies on rustls-cng which is only applicable for Windows Devices
+#[cfg(target_os = "windows")]
 fn main() -> anyhow::Result<()> {
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, rx) = std::sync::mpsc::channel();  
 
     std::thread::spawn(move || {
         if let Err(e) = server::run_server(tx) {
