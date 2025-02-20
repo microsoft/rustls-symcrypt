@@ -78,3 +78,10 @@ jobs:
     - name: Run test (Release, static)
       if: matrix.run-tests
       run: cargo test --release --features ${{ env.FEATURES_TO_TEST }} --target ${{ matrix.target }}
+
+    - name: Run test (Release, static)
+      if: matrix.run-tests
+      run: 
+        cd rustls-symcrypt/tests
+        cargo test 
+        
