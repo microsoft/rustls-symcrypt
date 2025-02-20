@@ -83,4 +83,4 @@ jobs:
       if: matrix.run-tests
       run: |
         cd rustls-symcrypt/tests
-        cargo test --test-threads=1 --features ${{ env.FEATURES_TO_TEST }}
+        cargo test  --features ${{ env.FEATURES_TO_TEST }} -- --test-threads=1
