@@ -2,9 +2,10 @@
 name = "rustls-symcrypt"
 authors = ["Microsoft"]
 version = "0.2.1"
-edition = "2021"
 license = "Apache-2.0 OR ISC OR MIT"
 description = "Implementation of rustls crypto provider model for SymCrypt"
+edition.workspace = true
+rust-version.workspace = true
 homepage = "https://github.com/microsoft/SymCrypt"
 repository = "https://github.com/microsoft/rustls-symcrypt"
 readme = "README.md"
@@ -13,7 +14,8 @@ readme = "README.md"
 
 [dependencies]
 rustls = { version = "0.23.0", default-features = false, features = ["tls12", "std", "custom-provider"]}
-symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.5.1" }
+symcrypt = {version = "0.5.1" }
+
 rustls-pki-types = "1.11.0"
 pkcs1 = { version = "0.7.5", features = ["alloc"], default-features = false }
 pkcs8 = "0.10"

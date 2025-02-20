@@ -26,7 +26,7 @@ const CHACHA_KEY_LENGTH: usize = 32;
 /// ChaCha for TLS 1.2
 /// ChaCha functionality will be disabled by default, in order to enable ChaCha functionality,
 /// user must pass the "chacha" feature via `Cargo.toml`
-
+///
 /// `Tls12ChaCha` impls `Tls12AeadAlgorithm`.
 #[cfg(feature = "chacha")]
 pub struct Tls12ChaCha;
@@ -194,7 +194,7 @@ impl MessageDecrypter for Tls12ChaCha20Poly1305 {
 
 /// GCM 1.2
 /// Tls12Gcm impls [`Tls12AeadAlgorithm`].
-
+///
 /// `algo_type` represents either `Aes128Gcm` or `Aes256Gcm` which corresponds to a 16 and 32 byte key respectively.
 pub struct Tls12Gcm {
     pub(crate) algo_type: AesGcm,

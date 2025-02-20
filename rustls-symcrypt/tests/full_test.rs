@@ -9,7 +9,6 @@ use std::thread;
 
 use rustls::crypto::SupportedKxGroup;
 use rustls::{CipherSuite, SupportedCipherSuite};
-use rustls_pemfile;
 
 use rustls_symcrypt::{
     custom_symcrypt_provider, default_symcrypt_provider, SECP256R1, SECP384R1,
@@ -79,7 +78,7 @@ fn test_with_config(
 
     // Add default webpki roots to the root store
     let mut root_store = rustls::RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
 
     let cert_path = TEST_CERT_PATH
@@ -141,7 +140,7 @@ fn test_with_custom_config_to_internet(
 
     // Add default webpki roots to the root store
     let root_store = rustls::RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
 
     let config = rustls::ClientConfig::builder_with_provider(Arc::new(custom_symcrypt_provider(
@@ -449,7 +448,7 @@ fn test_default_client() {
 
     // Add default webpki roots to the root store
     let mut root_store = rustls::RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
 
     let cert_path = TEST_CERT_PATH

@@ -77,7 +77,7 @@ pub static TLS13_AES_128_GCM_SHA256: SupportedCipherSuite =
     });
 
 /// TLS 1.2
-
+///
 /// The TLS1.2 ciphersuite TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256.
 #[cfg(feature = "chacha")]
 pub static TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256: SupportedCipherSuite =
