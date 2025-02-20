@@ -63,7 +63,7 @@ jobs:
     - name: Release build
       run: cargo build --workspace --exclude examples --release --locked --verbose --target ${{ matrix.target }}
 
-    # - TODO: re-enable when static linking is ready.
+    # TODO: re-enable when static linking is ready.
     # - name: Run tests (Debug, dynamic)
     #   if: matrix.run-tests
     #   run: cargo test --workspace --exclude examples --locked --verbose --all-features --target ${{ matrix.target }}
@@ -81,3 +81,5 @@ jobs:
     - name: Run test (Release, static)
       if: matrix.run-tests
       run: cargo test --release --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --test full_test
+    
+    # TODO: Investigate full tests + benchmarking 

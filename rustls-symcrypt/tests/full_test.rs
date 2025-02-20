@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
 
 use rustls::crypto::SupportedKxGroup;
 use rustls::{CipherSuite, SupportedCipherSuite};
@@ -66,9 +65,6 @@ fn start_openssl_server() -> OpenSSLServer {
         .stderr(std::process::Stdio::null()) // Suppress standard error
         .spawn()
         .expect("Failed to start OpenSSL server.");
-
-    // wait for openssl server
-    thread::sleep(Duration::from_secs(2));
 
     OpenSSLServer(child)
 }
@@ -432,73 +428,73 @@ fn test_tls12_ecdsa_poly_1305_to_internet() {
     );
 }
 
-// #[test]
-// fn test_default_client() {
-//     // Spawn a concurrent thread that starts the server
-//     let server_thread = {
-//         let openssl_server = Arc::new(Mutex::new(start_openssl_server()));
-//         thread::spawn(move || {
-//             openssl_server
-//                 .lock()
-//                 .unwrap()
-//                 .0
-//                 .wait()
-//                 .expect("OpenSSL server crashed unexpectedly");
-//         })
-//     };
+#[test]
+fn test_default_client() {
+    // Spawn a concurrent thread that starts the server
+    let server_thread = {
+        let openssl_server = Arc::new(Mutex::new(start_openssl_server()));
+        thread::spawn(move || {
+            openssl_server
+                .lock()
+                .unwrap()
+                .0
+                .wait()
+                .expect("OpenSSL server crashed unexpectedly");
+        })
+    };
 
-//     // Wait for the server to start
-//     thread::sleep(std::time::Duration::from_secs(5));
+    // Wait for the server to start
+    thread::sleep(std::time::Duration::from_secs(5));
 
-//     // Add default webpki roots to the root store
-//     let mut root_store = rustls::RootCertStore {
-//         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
-//     };
+    // Add default webpki roots to the root store
+    let mut root_store = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
 
-//     let cert_path = TEST_CERT_PATH
-//         .join("RootCA.pem")
-//         .into_os_string()
-//         .into_string()
-//         .unwrap();
+    let cert_path = TEST_CERT_PATH
+        .join("RootCA.pem")
+        .into_os_string()
+        .into_string()
+        .unwrap();
 
-//     let certs = rustls_pemfile::certs(&mut BufReader::new(&mut File::open(cert_path).unwrap()))
-//         .collect::<Result<Vec<_>, _>>()
-//         .unwrap();
+    let certs = rustls_pemfile::certs(&mut BufReader::new(&mut File::open(cert_path).unwrap()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
-//     root_store.add_parsable_certificates(certs);
+    root_store.add_parsable_certificates(certs);
 
-//     let config = rustls::ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
-//         .with_safe_default_protocol_versions()
-//         .unwrap()
-//         .with_root_certificates(root_store)
-//         .with_no_client_auth();
+    let config = rustls::ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
 
-//     let server_name = "localhost".try_into().unwrap();
+    let server_name = "localhost".try_into().unwrap();
 
-//     let mut sock = TcpStream::connect("localhost:4443").unwrap();
+    let mut sock = TcpStream::connect("localhost:4443").unwrap();
 
-//     let mut conn = rustls::ClientConnection::new(Arc::new(config), server_name).unwrap();
-//     let mut tls = rustls::Stream::new(&mut conn, &mut sock);
-//     tls.write_all(
-//         concat!(
-//             "GET / HTTP/1.1\r\n",
-//             "Host: localhost\r\n",
-//             "Connection: close\r\n",
-//             "Accept-Encoding: identity\r\n",
-//             "\r\n"
-//         )
-//         .as_bytes(),
-//     )
-//     .unwrap();
+    let mut conn = rustls::ClientConnection::new(Arc::new(config), server_name).unwrap();
+    let mut tls = rustls::Stream::new(&mut conn, &mut sock);
+    tls.write_all(
+        concat!(
+            "GET / HTTP/1.1\r\n",
+            "Host: localhost\r\n",
+            "Connection: close\r\n",
+            "Accept-Encoding: identity\r\n",
+            "\r\n"
+        )
+        .as_bytes(),
+    )
+    .unwrap();
 
-//     let ciphersuite = tls.conn.negotiated_cipher_suite().unwrap();
+    let ciphersuite = tls.conn.negotiated_cipher_suite().unwrap();
 
-//     let mut exit_buffer: [u8; 1] = [0]; // Size 1 because "Q" is a single byte command
-//     exit_buffer[0] = b'Q'; // Assign the ASCII value of "Q" to the buffer
+    let mut exit_buffer: [u8; 1] = [0]; // Size 1 because "Q" is a single byte command
+    exit_buffer[0] = b'Q'; // Assign the ASCII value of "Q" to the buffer
 
-//     // Write the "Q" command to the TLS connection stream
-//     tls.write_all(&exit_buffer).unwrap();
+    // Write the "Q" command to the TLS connection stream
+    tls.write_all(&exit_buffer).unwrap();
 
-//     assert_eq!(ciphersuite.suite(), CipherSuite::TLS13_AES_256_GCM_SHA384);
-//     drop(server_thread);
-// }
+    assert_eq!(ciphersuite.suite(), CipherSuite::TLS13_AES_256_GCM_SHA384);
+    drop(server_thread);
+}
