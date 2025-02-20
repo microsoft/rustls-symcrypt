@@ -34,7 +34,6 @@ jobs:
     steps:
     - uses: Swatinem/rust-cache@v2
 
-
     # Checkout rustls-symcrypt code
     - name: Checkout rustls-symcrypt
       uses: actions/checkout@v4
