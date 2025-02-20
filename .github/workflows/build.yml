@@ -80,21 +80,27 @@ jobs:
           echo "SYMCRYPT_LIB_PATH=$dir/symcrypt/dll" >> $env:GITHUB_ENV   
         }
 
-    - name: Move SymCrypt to System Path
-      run: |
-        ARCH=$(uname -m)
-        if [ "$ARCH" = "x86_64" ]; then
-          LIB_DIR="/usr/lib/x86_64-linux-gnu"
-        elif [ "$ARCH" = "aarch64" ]; then
-          LIB_DIR="/usr/lib/aarch64-linux-gnu"
-        else
-          echo "Unsupported architecture: $ARCH"
-          exit 1
-        fi
-        sudo mkdir -p $LIB_DIR
-        sudo cp -f symcrypt/lib/libsymcrypt.so $LIB_DIR/
-        sudo ldconfig
+    - name: Move symcrypt.so to ld_linker path for linux
       shell: bash
+      run: |
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          ARCH=$(uname -m)
+          if [[ "$ARCH" == "x86_64" ]]; then
+            LD_PATH="/usr/lib/x86_64-linux-gnu/"
+          elif [[ "$ARCH" == "aarch64" ]]; then
+            LD_PATH="/usr/lib/aarch64-linux-gnu/"
+          else
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+          fi
+          echo "Moving all .so files to $LD_PATH"
+          sudo mkdir -p "$LD_PATH"
+          sudo cp -af symcrypt/lib/*.so* "$LD_PATH"
+          sudo ldconfig
+        else
+          echo "Skipping SymCrypt move: No action needed for $RUNNER_OS"
+        fi
+      
 
     - name: Debug build
       run: cargo build --locked --verbose --target ${{ matrix.target }}
