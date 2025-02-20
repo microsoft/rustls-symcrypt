@@ -5,8 +5,8 @@
 // Usage: cargo run --bin sample_client_server
 //  The reference for this program is https://github.com/rustls/rustls-cng/blob/dev/tests/test_client_server.rs
 
-// Disable file when not compiling on Windows
-#![cfg(windows)]
+// if not windows, disable dead code and unused imports
+#![cfg_attr(not(windows), allow(dead_code, unused_imports))]
 
 mod client {
 
@@ -201,6 +201,7 @@ mod server {
 }
 
 // This program relies on rustls-cng which is only applicable for Windows Devices
+#[cfg(windows)]
 fn main() -> anyhow::Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
@@ -216,4 +217,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+// Dummy main to pass build and test pipelines on non Windows devices.
+#[cfg(not(windows))]
+fn main() {
+    println!("This program is only applicable for Windows Devices");
 }
