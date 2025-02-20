@@ -2,9 +2,11 @@
 name = "rustls-symcrypt-examples"
 version = "0.0.1"
 edition = "2021"
-authors = ["nnmkhang"]
+authors = ["Microsoft"]
 license = "Apache-2.0 OR ISC OR MIT"
 description = "rustls-symcrypt example code"
+edition.workspace = true
+rust-version.workspace = true
 publish = false
 
 [dependencies]
