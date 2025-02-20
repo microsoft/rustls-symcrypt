@@ -94,11 +94,11 @@ pub fn default_symcrypt_provider() -> CryptoProvider {
 /// let mut root_store = RootCertStore {
 ///     roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
 /// };
-
+///
 /// // Set custom config of cipher suites that have been imported from rustls_symcrypt.
 /// let cipher_suites = vec![TLS13_AES_128_GCM_SHA256];
 /// let kx_group = vec![SECP256R1];
-
+///
 /// let mut config =
 ///     ClientConfig::builder_with_provider(Arc::new(custom_symcrypt_provider(
 ///         Some(cipher_suites), Some(kx_group))))

@@ -1,28 +1,28 @@
 [package]
 name = "rustls-symcrypt-examples"
 version = "0.0.1"
-edition = "2021"
-authors = ["nnmkhang"]
+authors = ["Microsoft"]
 license = "Apache-2.0 OR ISC OR MIT"
 description = "rustls-symcrypt example code"
+edition.workspace = true
+rust-version.workspace = true
 publish = false
 
 [dependencies]
 rustls-symcrypt = {path = "../rustls-symcrypt"}
-rustls = { version = "0.23.0", features = ["tls12", "std"], default-features = false }
+rustls = { version = "0.23.0", default-features = false, features = ["tls12", "std", "custom-provider"]}
 webpki-roots = "0.26"
-webpki = {package = "rustls-webpki", version = "0.102", features = ["alloc"], default-features = false}
+webpki = {package = "rustls-webpki", default-features = false, version = "0.102", features = ["alloc"]}
 rustls-pemfile = "2.1.0"
+rustls-pki-types = "1.10"
 cmake = "0.1"
 once_cell = "1.8.0"
-
-rustls-platform-verifier = "0.4.0"
-
-rustls-cng = "0.6.0"
-rustls-pki-types = "1.10"
-anyhow = "1.0"
 hex = "0.4"
 
+rustls-platform-verifier = "0.5.0"
+
+rustls-cng = "0.6.0"
+anyhow = "1.0"
 
 
 [[bin]]
@@ -42,5 +42,5 @@ name = "sample_internet_client_platform"
 path = "bin/sample_internet_client_platform.rs"
 
 [[bin]]
-name = "sample_client_server"
-path = "bin/sample_client_server.rs"
+name = "sample_windows_client_server"
+path = "bin/sample_windows_client_server.rs"
