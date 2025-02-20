@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use rustls::crypto::SupportedKxGroup;
 use rustls::{CipherSuite, SupportedCipherSuite};
@@ -65,6 +66,10 @@ fn start_openssl_server() -> OpenSSLServer {
         .stderr(std::process::Stdio::null()) // Suppress standard error
         .spawn()
         .expect("Failed to start OpenSSL server.");
+
+        // wait for openssl server
+        thread::sleep(Duration::from_secs(5));
+
 
     OpenSSLServer(child)
 }
