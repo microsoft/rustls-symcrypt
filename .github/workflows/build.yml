@@ -59,6 +59,11 @@ jobs:
 
     - uses: Swatinem/rust-cache@v2
 
+
+    # echo "$dir/symcrypt/lib" >> $env:GITHUB_PATH
+    # echo "LD_LIBRARY_PATH=$dir/symcrypt/lib:$env:LD_LIBRARY_PATH" >> $env:GITHUB_ENV
+    # echo "LIBRARY_PATH=$dir/symcrypt/lib:$env:LIBRARY_PATH" >> $env:GITHUB_ENV
+    # echo "SYMCRYPT_LIB_PATH=$dir/symcrypt/lib" >> $env:GITHUB_ENV
     - name: Download SymCrypt
       shell: pwsh
       run: |
@@ -67,10 +72,6 @@ jobs:
           Invoke-WebRequest -Uri ${{ matrix.symcrypt }} -OutFile symcrypt.tar.gz
           New-Item -ItemType Directory -Force -Path symcrypt
           tar -xzf symcrypt.tar.gz -C symcrypt
-          echo "$dir/symcrypt/lib" >> $env:GITHUB_PATH
-          echo "LD_LIBRARY_PATH=$dir/symcrypt/lib:$env:LD_LIBRARY_PATH" >> $env:GITHUB_ENV
-          echo "LIBRARY_PATH=$dir/symcrypt/lib:$env:LIBRARY_PATH" >> $env:GITHUB_ENV
-          echo "SYMCRYPT_LIB_PATH=$dir/symcrypt/lib" >> $env:GITHUB_ENV
         } else {
           Invoke-WebRequest -Uri ${{ matrix.symcrypt }} -OutFile symcrypt.zip
           New-Item -ItemType Directory -Force -Path symcrypt
@@ -78,6 +79,22 @@ jobs:
           echo "$dir/symcrypt/dll" >> $env:GITHUB_PATH
           echo "SYMCRYPT_LIB_PATH=$dir/symcrypt/dll" >> $env:GITHUB_ENV   
         }
+
+    - name: Move SymCrypt to System Path
+      run: |
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "x86_64" ]; then
+          LIB_DIR="/usr/lib/x86_64-linux-gnu"
+        elif [ "$ARCH" = "aarch64" ]; then
+          LIB_DIR="/usr/lib/aarch64-linux-gnu"
+        else
+          echo "Unsupported architecture: $ARCH"
+          exit 1
+        fi
+        sudo mkdir -p $LIB_DIR
+        sudo cp -f symcrypt/lib/libsymcrypt.so $LIB_DIR/
+        sudo ldconfig
+      shell: bash
 
     - name: Debug build
       run: cargo build --locked --verbose --target ${{ matrix.target }}
