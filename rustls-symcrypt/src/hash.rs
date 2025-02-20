@@ -2,37 +2,38 @@
 use rustls::crypto::hash::{Context, Hash, HashAlgorithm, Output};
 use symcrypt::hash::{sha256, sha384, HashState, Sha256State, Sha384State};
 
-/// ShaXXX is a struct that represents either a Sha256 or Sha384 hash Algorithm
-///
-/// ShaXXXContext is a wrapper over the ShaXXXState from SymCrypt. This is what needs to
-/// be initialized in order to run stateful operations on the SymCrypt ShaXXXState.
-///
-///
-///
-/// Impl's for the Hash trait for both Sha256 and Sha384 implement the Ruslts traits for hashing
-///
-/// `algorithm()` returns Rustls' friendly [`HashAlgorithm`] name
-///
-/// `output_len()` returns the output length for ShaXXX
-///
-/// `start()` creates a `Box<>'d` ShaXXXContext that is needed in order to run stateful operations
-///
-/// `hash()` computes a stateless hash operation based on the current ShaXXX hash algorithm.
-///
-///
-///
-/// Impl's for the Context trait for both [`Sha256Context`] and [`Sha384Context`] implement the Rustls trait for
-/// hashing context which is called state on the SymCrypt side.
-///
-/// `fork_finish()` creates clones of the current hash state and then returns the clone'd hash result
-/// There is no intermediate fork operation like this for this native to SymCrypt so a clone must be created.
-///
-/// `fork()` creates a new ShaXXXContext that is a clone of the current Hash state
-///
-/// `finish()` returns the hash output for the current ShaXXXContext. This results in the end of lifetime for the ShaXXXContext and therefore is
-/// the end of life for ShaXXXState. `SymCryptWipe()` will be called under the covers.
-///
-/// `update()` appends data to the ShaXXXState in order to be hashed. This operation can be done multiple times.
+// ShaXXX is a struct that represents either a Sha256 or Sha384 hash Algorithm
+//
+// ShaXXXContext is a wrapper over the ShaXXXState from SymCrypt. This is what needs to
+// be initialized in order to run stateful operations on the SymCrypt ShaXXXState.
+//
+//
+//
+// Impl's for the Hash trait for both Sha256 and Sha384 implement the Ruslts traits for hashing
+//
+// `algorithm()` returns Rustls' friendly [`HashAlgorithm`] name
+//
+// `output_len()` returns the output length for ShaXXX
+//
+// `start()` creates a `Box<>'d` ShaXXXContext that is needed in order to run stateful operations
+//
+// `hash()` computes a stateless hash operation based on the current ShaXXX hash algorithm.
+//
+//
+//
+// Impl's for the Context trait for both [`Sha256Context`] and [`Sha384Context`] implement the Rustls trait for
+// hashing context which is called state on the SymCrypt side.
+//
+// `fork_finish()` creates clones of the current hash state and then returns the clone'd hash result
+// There is no intermediate fork operation like this for this native to SymCrypt so a clone must be created.
+//
+// `fork()` creates a new ShaXXXContext that is a clone of the current Hash state
+//
+// `finish()` returns the hash output for the current ShaXXXContext. This results in the end of lifetime for the ShaXXXContext and therefore is
+// the end of life for ShaXXXState. `SymCryptWipe()` will be called under the covers.
+//
+// `update()` appends data to the ShaXXXState in order to be hashed. This operation can be done multiple times.
+
 
 /// Structs related to Sha256
 pub struct Sha256;
