@@ -14,8 +14,8 @@ readme = "README.md"
 
 [dependencies]
 rustls = { version = "0.23.0", default-features = false, features = ["tls12", "std", "custom-provider"]}
-#symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.5.1" }
-symcrypt = {version = "0.5.1" }
+symcrypt = { path = "../../rust-symcrypt/rust-symcrypt", version = "0.5.1" }
+#symcrypt = {version = "0.5.1" }
 
 rustls-pki-types = "1.11.0"
 pkcs1 = { version = "0.7.5", features = ["alloc"], default-features = false }
