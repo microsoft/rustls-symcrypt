@@ -5,6 +5,7 @@
 // Usage: cargo run --bin sample_client_server
 //  The reference for this program is https://github.com/rustls/rustls-cng/blob/dev/tests/test_client_server.rs
 
+#[cfg(target_os = "windows")]
 mod client {
 
     use std::{
@@ -104,6 +105,7 @@ mod client {
     }
 }
 
+#[cfg(target_os = "windows")]
 mod server {
     use std::{
         io::{Read, Write},
