@@ -197,11 +197,10 @@ mod server {
     }
 }
 
-
 // This program relies on rustls-cng which is only applicable for Windows Devices
 #[cfg(target_os = "windows")]
 fn main() -> anyhow::Result<()> {
-    let (tx, rx) = std::sync::mpsc::channel();  
+    let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
         if let Err(e) = server::run_server(tx) {
