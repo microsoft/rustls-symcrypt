@@ -1,5 +1,7 @@
 name: Build Linux
 
+# TOOD: Investigate full tests + benchmarking
+
 on:
   push:
     branches: [ "main" ]
@@ -78,6 +80,3 @@ jobs:
     - name: Run test (Release, static)
       if: matrix.run-tests
       run: cargo test --release --features ${{ env.FEATURES_TO_TEST }} --target ${{ matrix.target }}
-
-    # TOOD: Investigate full tests + benchmarking
-    

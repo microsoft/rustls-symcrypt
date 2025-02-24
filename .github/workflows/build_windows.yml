@@ -1,5 +1,7 @@
 name: Build Windows
 
+# TOOD: Investigate full tests + benchmarking
+
 on:
   push:
     branches: [ "main" ]
@@ -81,6 +83,3 @@ jobs:
     - name: Run test (Release, static)
       if: matrix.run-tests
       run: cargo test --release --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --test full_test
-    
-    # TODO: Investigate full tests + benchmarking
-    
