@@ -1,9 +1,12 @@
-/// This program provides a simple client-server application using rustls-symcrypt and rustls-cng.
-/// It uses rustls-platform-verifier to utilize your machine's certificate validation for TLS communication.
-/// Both the client and server retrieve certificates from the "CurrentUser" "my" store.
+// This program provides a simple client-server application using rustls-symcrypt and rustls-cng.
+// It uses rustls-platform-verifier to utilize your machine's certificate validation for TLS communication.
+// Both the client and server retrieve certificates from the "CurrentUser" "my" store.
 // Please install rustls-client.pfx and rustls-server.pfx into "CurrentUser" "my" store if you want to test it. The password is "changeit"
-/// Usage: cargo run --bin sample_client_server
+// Usage: cargo run --bin sample_client_server
 //  The reference for this program is https://github.com/rustls/rustls-cng/blob/dev/tests/test_client_server.rs
+
+// if not windows, disable dead code and unused imports
+#![cfg_attr(not(windows), allow(dead_code, unused_imports))]
 
 mod client {
 
@@ -29,7 +32,7 @@ mod client {
     #[derive(Debug)]
     pub struct ClientCertResolver(String);
 
-    //this is the SHA256 thumbprint of the certificate in the CurrentUser My store
+    // This is the SHA256 thumbprint of the certificate in the CurrentUser My store
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
@@ -143,7 +146,7 @@ mod server {
         }
     }
 
-    //this is the SHA256 thumbprint of the certificate in the CurrentUser My store
+    // This is the SHA256 thumbprint of the certificate in the CurrentUser My store
     fn get_chain(hex_thumbprint: &str) -> Result<(Vec<CertificateDer<'static>>, CngSigningKey)> {
         let store = CertStore::open(CertStoreType::CurrentUser, "My")?;
         let thumbprint = hex::decode(hex_thumbprint)?;
@@ -197,9 +200,10 @@ mod server {
     }
 }
 
+// This program relies on rustls-cng which is only applicable for Windows Devices
+#[cfg(windows)]
 fn main() -> anyhow::Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
-
     std::thread::spawn(move || {
         if let Err(e) = server::run_server(tx) {
             eprintln!("Server error: {:?}", e);
@@ -213,4 +217,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+// Dummy main to pass build and test pipelines on non Windows devices.
+#[cfg(not(windows))]
+fn main() {
+    println!("This program is only applicable for Windows Devices");
 }
