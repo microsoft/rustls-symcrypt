@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../../README.md")]
 use rustls::crypto::{CryptoProvider, GetRandomFailed, SecureRandom, SupportedKxGroup};
 
 use rustls::SupportedCipherSuite;
