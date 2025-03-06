@@ -319,6 +319,8 @@ struct SymCryptAlgorithm {
     key_type: KeyType,
 }
 
+const FIPS_ENABLED: bool = !cfg!(feature = "dynamic"); // Evaluated at compile time, not runtime.
+
 /// [`SignatureVerificationAlgorithm`] for SymCryptAlgorithm.
 /// Creates either a RSA or ECC key depending on the SymCryptAlgorithm then does a verify based on the
 /// provided `public_key` bytes, `message` bytes and the `signature` bytes.
@@ -383,6 +385,6 @@ impl SignatureVerificationAlgorithm for SymCryptAlgorithm {
     }
 
     fn fips(&self) -> bool {
-        true
+        FIPS_ENABLED
     }
 }
