@@ -31,6 +31,7 @@ pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>
         return Ok(ecdsa);
     }
 
+    // SymCrypt does not support ed25519 keys for singing.
     Err(Error::General(
         "failed to parse private key as RSA or ECDSA".into(),
     ))

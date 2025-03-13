@@ -62,6 +62,12 @@ X25519 // Enabled with the `x25519` feature
 
 **Note:** `X25519` is disabled by default. To enable, add `x25519` feature in your `Cargo.toml`.
 
+
+## Limitations: 
+- `rustls-symcrypt` does not support `ed25519` keys/certs.
+- At the moment there is no support for `QUIC`.
+- FIPS is only supported with the `dynamic` feature.
+
 --- 
 
 ## Usage
@@ -80,7 +86,7 @@ Dynamic Linking:
 ```toml
 [dependencies]
 rustls = { version = "0.23.0", features = ["tls12", "std", "custom-provider"], default-features = false }
-rustls_symcrypt = {version = "0.3.0", features = "dynamic"}
+rustls_symcrypt = {version = "0.3.0", features = ["dynamic"]}
 ```
 
 **Note:** If you wish to enable `x25519` or `chacha` you may add it as a feature at this time.
