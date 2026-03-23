@@ -82,7 +82,7 @@ mod client {
         let client_config =
             ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
                 .with_safe_default_protocol_versions()?
-                .with_platform_verifier()
+                .with_platform_verifier()?
                 .with_client_cert_resolver(Arc::new(ClientCertResolver(
                     hex_thumbprint.to_string(),
                 )));

@@ -10,14 +10,13 @@ use symcrypt::{
     rsa::{RsaKey, RsaKeyUsage},
 };
 
-use pkcs1::der::Decode;
+use der::Decode;
+use pkcs1::der::{Decode as _, Encode};
 use pkcs1::RsaPrivateKey;
 use pkcs8::PrivateKeyInfo;
 use sec1::EcPrivateKey;
 use std::fmt::Debug;
 use std::sync::Arc;
-
-use der::Encode;
 use pkcs1::RsaPublicKey as ECSignatureData;
 use pkcs1::UintRef;
 use symcrypt::hash::{SHA256_RESULT_SIZE, SHA384_RESULT_SIZE, SHA512_RESULT_SIZE};
