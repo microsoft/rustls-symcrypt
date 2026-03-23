@@ -19,7 +19,7 @@ use symcrypt::chacha::{chacha20_poly1305_decrypt_in_place, chacha20_poly1305_enc
 #[cfg(feature = "chacha")]
 const CHACHA_TAG_LENGTH: usize = 16;
 #[cfg(feature = "chacha")]
-const CHAHCA_NONCE_LENGTH: usize = 12;
+const CHACHA_NONCE_LENGTH: usize = 12;
 #[cfg(feature = "chacha")]
 const CHACHA_KEY_LENGTH: usize = 32;
 
@@ -69,7 +69,7 @@ impl Tls12AeadAlgorithm for Tls12ChaCha {
     fn key_block_shape(&self) -> KeyBlockShape {
         KeyBlockShape {
             enc_key_len: CHACHA_KEY_LENGTH, // ChaCha key must be 32 bytes.
-            fixed_iv_len: CHAHCA_NONCE_LENGTH,
+            fixed_iv_len: CHACHA_NONCE_LENGTH,
             explicit_nonce_len: 0,
         }
     }
@@ -80,7 +80,7 @@ impl Tls12AeadAlgorithm for Tls12ChaCha {
         iv: &[u8],
         _explicit: &[u8],
     ) -> Result<ConnectionTrafficSecrets, UnsupportedOperationError> {
-        assert_eq!(CHAHCA_NONCE_LENGTH, iv.len()); // Nonce length must be 12 for ChaCha
+        assert_eq!(CHACHA_NONCE_LENGTH, iv.len()); // Nonce length must be 12 for ChaCha
         Ok(ConnectionTrafficSecrets::Chacha20Poly1305 {
             key,
             iv: Iv::new(iv[..].try_into().unwrap()),
