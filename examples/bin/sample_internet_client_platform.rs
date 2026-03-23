@@ -16,7 +16,7 @@ fn main() {
         .unwrap()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(
-            Verifier::new().with_provider(Arc::new(default_symcrypt_provider())),
+            Verifier::new(Arc::new(default_symcrypt_provider())).unwrap(),
         ))
         .with_no_client_auth();
 
