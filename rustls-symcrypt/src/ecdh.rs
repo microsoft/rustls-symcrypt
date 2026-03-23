@@ -67,7 +67,7 @@ pub const SECP384R1: &dyn SupportedKxGroup = &KxGroup {
 ///
 /// `name()` returns the `NamedGroup` of the current [`KeyExchange`] group.
 impl SupportedKxGroup for KxGroup {
-    fn start(&self) -> Result<Box<(dyn ActiveKeyExchange)>, Error> {
+    fn start(&self) -> Result<Box<dyn ActiveKeyExchange>, Error> {
         let ec_key = EcKey::generate_key_pair(self.curve_type, EcKeyUsage::EcDh)
             .map_err(|e| Error::General(format!("SymCrypt key generation failed: {:?}", e)))?;
         let mut pub_key = ec_key
