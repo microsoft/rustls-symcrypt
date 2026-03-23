@@ -13,12 +13,12 @@ use symcrypt::{
 use der::Decode;
 use pkcs1::der::{Decode as _, Encode};
 use pkcs1::RsaPrivateKey;
+use pkcs1::RsaPublicKey as ECSignatureData;
+use pkcs1::UintRef;
 use pkcs8::PrivateKeyInfo;
 use sec1::EcPrivateKey;
 use std::fmt::Debug;
 use std::sync::Arc;
-use pkcs1::RsaPublicKey as ECSignatureData;
-use pkcs1::UintRef;
 use symcrypt::hash::{SHA256_RESULT_SIZE, SHA384_RESULT_SIZE, SHA512_RESULT_SIZE};
 
 pub fn any_supported_type(der: &PrivateKeyDer<'_>) -> Result<Arc<dyn SigningKey>, Error> {

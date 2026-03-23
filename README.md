@@ -25,9 +25,9 @@ Add `rustls-symcrypt` to your `Cargo.toml`:
 ```toml
 [dependencies]
 rustls = { version = "0.23.0", features = ["tls12", "std", "custom-provider"], default-features = false }
-rustls_symcrypt = "0.2.1"
+rustls_symcrypt = "0.2.2"
 # To enable the chacha feature:
-# rustls_symcrypt = {version = "0.2.1", features = ["chacha"]}
+# rustls_symcrypt = {version = "0.2.2", features = ["chacha"]}
 ```
 
 ## Supported Ciphers
