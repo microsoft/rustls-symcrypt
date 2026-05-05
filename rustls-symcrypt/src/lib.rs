@@ -2,6 +2,7 @@
 use rustls::crypto::{CryptoProvider, GetRandomFailed, SecureRandom, SupportedKxGroup};
 
 use rustls::SupportedCipherSuite;
+use std::sync::{Arc, OnceLock};
 use symcrypt::symcrypt_random;
 
 mod cipher_suites;
@@ -68,6 +69,41 @@ pub fn default_symcrypt_provider() -> CryptoProvider {
         secure_random: &SymCrypt,
         key_provider: &signer::SymCryptProvider,
     }
+}
+
+/// Returns a process-cached `Arc<CryptoProvider>` for callers that want
+/// session-/connection-/test-scoped sharing without paying for repeated
+/// `Vec<SupportedCipherSuite>` and `Vec<&dyn SupportedKxGroup>` allocations
+/// on every call to [`default_symcrypt_provider`].
+///
+/// Initialized lazily on the first call; subsequent calls are an
+/// `Arc::clone` (atomic refcount bump, no heap allocation).
+///
+/// Prefer this over `Arc::new(default_symcrypt_provider())` in any code
+/// path that may run more than once per process — TLS integration tests,
+/// per-connection setup, multi-config harnesses, etc.
+///
+/// ```rust
+/// use rustls::{ClientConfig, RootCertStore};
+/// use rustls_symcrypt::default_symcrypt_provider_arc;
+/// use webpki_roots;
+///
+/// let mut root_store = RootCertStore {
+///     roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+/// };
+///
+/// let provider = default_symcrypt_provider_arc();
+/// let mut config = ClientConfig::builder_with_provider(provider)
+///     .with_safe_default_protocol_versions()
+///     .unwrap()
+///     .with_root_certificates(root_store)
+///     .with_no_client_auth();
+/// ```
+pub fn default_symcrypt_provider_arc() -> Arc<CryptoProvider> {
+    static PROVIDER: OnceLock<Arc<CryptoProvider>> = OnceLock::new();
+    PROVIDER
+        .get_or_init(|| Arc::new(default_symcrypt_provider()))
+        .clone()
 }
 
 /// `custom_symcrypt_provider` provides a way to set up an custom config using a `symcrypt` crypto backend.
@@ -189,5 +225,17 @@ mod test {
         let _ = random.fill(&mut buff_2);
 
         assert_ne!(buff_1, buff_2);
+    }
+
+    #[test]
+    fn test_default_symcrypt_provider_arc_is_cached() {
+        let a = default_symcrypt_provider_arc();
+        let b = default_symcrypt_provider_arc();
+        assert!(
+            Arc::ptr_eq(&a, &b),
+            "default_symcrypt_provider_arc must return the same Arc on repeat calls",
+        );
+        assert_eq!(a.cipher_suites.len(), DEFAULT_CIPHER_SUITES.len());
+        assert!(!a.kx_groups.is_empty());
     }
 }
