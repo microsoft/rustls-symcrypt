@@ -53,16 +53,33 @@ TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 // Enabled with the `chacha` feature
 
 ## Supported Key Exchanges
 
-Key exchanges are listed below, ordered by preference. IE: `SECP384R1` is preferred over `SECP256R1`.
+Key exchanges are listed below, ordered by preference. IE: `X25519MLKEM768` is preferred over `X25519`.
 
 ```ignore
-SECP384R1
+X25519MLKEM768
+X25519
 SECP256R1
-SECP521R1
-X25519 // Enabled with the `x25519` feature
+SECP384R1
 ```
 
-**Note:** `X25519` is disabled by default. To enable, add `x25519` feature in your `Cargo.toml`.
+`SECP256R1MLKEM768` is also supported but, following upstream `rustls`, is not offered by default. Pass it
+explicitly to `custom_symcrypt_provider()` if you need it.
+
+### Post-quantum key exchange
+
+`X25519MLKEM768` is offered first by default, so two peers using this provider negotiate a hybrid
+post-quantum key exchange with no configuration. A hybrid group runs `X25519` and `ML-KEM-768` in
+parallel and derives from both secrets, so the connection is secure if either half is.
+
+Both hybrid groups are TLS 1.3 only. `X25519` is listed separately after the hybrid so that a peer
+which does not yet support post-quantum can select the classical half of the same key share, without
+costing a `HelloRetryRequest` round trip.
+
+**Note:** `CryptoProvider::fips()` reports `false` for these groups. See the `fips()` comment in
+`src/mlkem.rs` for the reasoning.
+
+**Note:** `X25519` is now always available. The `x25519` cargo feature is a deprecated no-op, kept for
+one release so that manifests naming it still resolve, and will be removed in a future version.
 
 ## Dependencies
 
@@ -72,15 +89,15 @@ Refer to the [rust-symcrypt Quick Start Guide](https://github.com/microsoft/rust
 ## Usage
 
 Add `rustls-symcrypt` to your `Cargo.toml`:
-**Note:** If you wish to enable `x25519` or `chacha` you may add it as a feature at this time.
+**Note:** If you wish to enable `chacha` you may add it as a feature at this time.
 
 ```toml
 [dependencies]
 # Disabling aws-lc as it slows down build times and is not needed.
 rustls = { version = "0.23.0", features = ["tls12", "std"], default-features = false }
-rustls_symcrypt = "0.2.2"
+rustls_symcrypt = "0.3.0"
 # To enable the chacha feature:
-# rustls_symcrypt = {version = "0.2.2", features = ["chacha"]}
+# rustls_symcrypt = {version = "0.3.0", features = ["chacha"]}
 ```
 
 ### Default Configuration
