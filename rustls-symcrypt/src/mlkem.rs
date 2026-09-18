@@ -67,7 +67,7 @@ impl SupportedKxGroup for MlKem {
     /// the default in place compiles cleanly and fails at runtime with mismatched secrets.
     fn start_and_complete(&self, client_share: &[u8]) -> Result<CompletedKeyExchange, Error> {
         let peer_key = MlKemKey::from_encapsulation_key(self.params, client_share)
-            .map_err(|_| INVALID_KEY_SHARE)?;
+            .map_err(map_key_import_error)?;
         // Importing the client's key can fail on bad input, so that is peer misbehavior. Failing to
         // encapsulate to an already-validated key cannot be, so it must not be reported as such.
         let encapsulation = peer_key
@@ -96,10 +96,8 @@ impl SupportedKxGroup for MlKem {
         // conservative reading instead and report false until SymCrypt's CMVP status for ML-KEM is
         // confirmed.
         //
-        // This costs nothing today: no key exchange group in this provider overrides `fips()`, so
-        // `CryptoProvider::fips()` is already false and has been since the crate shipped. Making
-        // that meaningful needs an accurate override on every group, which is separate work with a
-        // compliance conversation attached.
+        // This costs nothing today: all key exchange groups in this provider report false, so
+        // `CryptoProvider::fips()` is already false and has been since the crate shipped.
         false
     }
 
@@ -151,6 +149,13 @@ impl ActiveKeyExchange for KeyExchange {
     }
 }
 
+fn map_key_import_error(error: SymCryptError) -> Error {
+    match error {
+        SymCryptError::WrongKeySize | SymCryptError::InvalidBlob => INVALID_KEY_SHARE,
+        error => Error::General(format!("SymCrypt ML-KEM key import failed: {}", error)),
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -192,6 +197,22 @@ mod test {
                 "a malformed client share must be reported as peer misbehavior"
             );
         }
+    }
+
+    #[test]
+    fn test_mlkem_key_import_error_mapping() {
+        assert_eq!(
+            map_key_import_error(SymCryptError::WrongKeySize),
+            INVALID_KEY_SHARE
+        );
+        assert_eq!(
+            map_key_import_error(SymCryptError::InvalidBlob),
+            INVALID_KEY_SHARE
+        );
+        assert!(matches!(
+            map_key_import_error(SymCryptError::MemoryAllocationFailure),
+            Error::General(_)
+        ));
     }
 
     #[test]

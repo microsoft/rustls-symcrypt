@@ -78,13 +78,13 @@ fn extract_ecc_signature(signature: &[u8], curve: CurveType) -> Result<Vec<u8>, 
 
     // Prepend zeros if r is smaller than component_length.
     if r.len() < component_length {
-        r_padded.extend(std::iter::repeat(0).take(component_length - r.len()));
+        r_padded.extend(std::iter::repeat_n(0, component_length - r.len()));
     }
     r_padded.extend_from_slice(r); // Add the actual r bytes.
 
     // Prepend zeros if s is smaller than component_length.
     if s.len() < component_length {
-        s_padded.extend(std::iter::repeat(0).take(component_length - s.len()));
+        s_padded.extend(std::iter::repeat_n(0, component_length - s.len()));
     }
     s_padded.extend_from_slice(s); // Add the actual s bytes.
 

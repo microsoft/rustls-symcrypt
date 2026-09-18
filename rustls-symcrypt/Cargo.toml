@@ -14,8 +14,8 @@ readme = "README.md"
 
 [dependencies]
 rustls = { version = "0.23.37", default-features = false, features = ["tls12", "std", "custom-provider"]}
-# TEMPORARY: pin rust-symcrypt PR 123 until symcrypt 0.6.0 is published.
-symcrypt = { version = "0.6.0", git = "https://github.com/microsoft/rust-symcrypt", rev = "6654dcbe0e85f689fe938a4c96e95d03cc1e709f" }
+# TEMPORARY: pin merged rust-symcrypt main until symcrypt 0.6.0 is published.
+symcrypt = { version = "0.6.0", git = "https://github.com/microsoft/rust-symcrypt", rev = "7143e4c3bfe4e305b2518681c7752ae3d7b7ddbb" }
 
 rustls-pki-types = "1.14.0"
 pkcs1 = { version = "0.7.5", features = ["alloc"], default-features = false }
