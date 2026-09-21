@@ -14,8 +14,11 @@ use rustls_symcrypt::{
     custom_symcrypt_provider, default_symcrypt_provider, SECP256R1, SECP384R1,
     TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
     TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, X25519,
+    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 };
+
+#[cfg(feature = "x25519")]
+use rustls_symcrypt::X25519;
 
 #[cfg(feature = "chacha")]
 use rustls_symcrypt::{
@@ -299,6 +302,7 @@ fn test_tls12_rsa_128_256() {
     drop(server_thread);
 }
 
+#[cfg(feature = "x25519")]
 #[test]
 fn test_tls13_256_384_with_25519() {
     let server_thread = {

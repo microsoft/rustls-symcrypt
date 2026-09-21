@@ -53,33 +53,32 @@ TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 // Enabled with the `chacha` feature
 
 ## Supported Key Exchanges
 
-Key exchanges are listed below, ordered by preference. IE: `X25519MLKEM768` is preferred over `X25519`.
+Default key exchanges are listed below in preference order.
 
 ```ignore
-X25519MLKEM768
-X25519
-SECP256R1
 SECP384R1
+SECP256R1
+SECP521R1
+X25519 // Enabled with the `x25519` feature
 ```
 
-`SECP256R1MLKEM768` is also supported but, following upstream `rustls`, is not offered by default. Pass it
-explicitly to `custom_symcrypt_provider()` if you need it.
+**Note:** `X25519` is disabled by default. Enable the `x25519` feature to use it.
 
 ### Post-quantum key exchange
 
-`X25519MLKEM768` is offered first by default, so two peers using this provider negotiate a hybrid
-post-quantum key exchange with no configuration. A hybrid group runs `X25519` and `ML-KEM-768` in
-parallel and derives from both secrets, so the connection is secure if either half is.
+The opt-in `pq` feature enables `X25519MLKEM768` and `SECP256R1MLKEM768`. It also enables the
+existing `x25519` feature required by `X25519MLKEM768`. Neither hybrid group is added to the default
+provider configuration.
 
-Both hybrid groups are TLS 1.3 only. `X25519` is listed separately after the hybrid so that a peer
-which does not yet support post-quantum can select the classical half of the same key share, without
-costing a `HelloRetryRequest` round trip.
+Select a hybrid group explicitly with `custom_symcrypt_provider()`:
 
-**Note:** `CryptoProvider::fips()` reports `false` for these groups. See the `fips()` comment in
-`src/mlkem.rs` for the reasoning.
+```rust,ignore
+use rustls_symcrypt::{custom_symcrypt_provider, X25519MLKEM768};
 
-**Note:** `X25519` is now always available. The `x25519` cargo feature is a deprecated no-op, kept for
-one release so that manifests naming it still resolve, and will be removed in a future version.
+let provider = custom_symcrypt_provider(None, Some(vec![X25519MLKEM768]));
+```
+
+Both hybrid groups are TLS 1.3 only and report `false` from `SupportedKxGroup::fips()`.
 
 ## Dependencies
 
@@ -89,7 +88,7 @@ Refer to the [rust-symcrypt Quick Start Guide](https://github.com/microsoft/rust
 ## Usage
 
 Add `rustls-symcrypt` to your `Cargo.toml`:
-**Note:** If you wish to enable `chacha` you may add it as a feature at this time.
+**Note:** Optional cipher suites and key exchanges are enabled through Cargo features.
 
 ```toml
 [dependencies]
@@ -98,6 +97,8 @@ rustls = { version = "0.23.0", features = ["tls12", "std"], default-features = f
 rustls_symcrypt = "0.3.0"
 # To enable the chacha feature:
 # rustls_symcrypt = {version = "0.3.0", features = ["chacha"]}
+# To enable the post-quantum hybrid groups:
+# rustls_symcrypt = {version = "0.3.0", features = ["pq"]}
 ```
 
 ### Default Configuration

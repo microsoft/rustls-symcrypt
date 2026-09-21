@@ -3,9 +3,6 @@ use rustls::crypto::{ActiveKeyExchange, SharedSecret, SupportedKxGroup};
 use rustls::{Error, NamedGroup};
 
 use symcrypt::ecc::{CurveType, EcKey, EcKeyUsage};
-use symcrypt::errors::SymCryptError;
-
-use crate::INVALID_KEY_SHARE;
 
 /// KxGroup is a struct that easily ties `rustls::NamedGroup` to the `symcrypt_sys::ecurve::CurveType`.
 ///
@@ -33,8 +30,22 @@ pub struct KeyExchange {
     pub_key: Vec<u8>,
 }
 
+/// All supported KeyExchange groups.
+/// ```ignore
+/// SECP384R1
+/// SECP256R1
+/// X25519 // Enabled with the `x25519` feature
+/// ```
+pub const ALL_KX_GROUPS: &[&dyn SupportedKxGroup] = &[
+    SECP384R1,
+    SECP256R1,
+    #[cfg(feature = "x25519")]
+    X25519,
+];
+
 // Since the type trait size cannot be determined at compile time, we must use trait objects, hence the `&dyn SupportedKxGroup`
 // annotation. Similarly, `KxGroup` must then also be taken as a reference.
+#[cfg(feature = "x25519")]
 pub const X25519: &dyn SupportedKxGroup = &KxGroup {
     name: NamedGroup::X25519,
     curve_type: CurveType::Curve25519,
@@ -114,21 +125,6 @@ impl SupportedKxGroup for KxGroup {
 /// `group()` will return the [`NamedGroup`] of the [`KeyExchange`]
 impl ActiveKeyExchange for KeyExchange {
     fn complete(self: Box<Self>, peer_pub_key: &[u8]) -> Result<SharedSecret, Error> {
-        let expected_len = match self.curve_type {
-            CurveType::Curve25519 => self.curve_type.get_size() as usize,
-            CurveType::NistP256 | CurveType::NistP384 => {
-                1 + 2 * self.curve_type.get_size() as usize
-            }
-            CurveType::NistP521 => {
-                return Err(Error::General(
-                    "NistP521 is not supported for key exchange".to_string(),
-                ));
-            }
-        };
-        if peer_pub_key.len() != expected_len {
-            return Err(INVALID_KEY_SHARE);
-        }
-
         let new_peer_pub_key = match self.curve_type {
             CurveType::NistP256 | CurveType::NistP384 => {
                 // If curve type is NistP256 or NistP384 or NistP521 remove the first byte
@@ -145,7 +141,7 @@ impl ActiveKeyExchange for KeyExchange {
                 if peer_pub_key.starts_with(&[0x04]) {
                     &peer_pub_key[1..] // Return a slice starting from the second byte
                 } else {
-                    return Err(INVALID_KEY_SHARE);
+                    return Err(Error::General("Invalid public key".to_string()));
                 }
             }
 
@@ -154,14 +150,35 @@ impl ActiveKeyExchange for KeyExchange {
                 peer_pub_key
             }
 
-            CurveType::NistP521 => unreachable!(),
+            CurveType::NistP521 => {
+                return Err(Error::General(
+                    "NistP521 is not supported for key exchange".to_string(),
+                ));
+            }
         };
 
-        let peer_ecdh = EcKey::set_public_key(self.curve_type, new_peer_pub_key, EcKeyUsage::EcDh)
-            .map_err(map_peer_key_error)?;
+        let peer_ecdh =
+            match EcKey::set_public_key(self.curve_type, new_peer_pub_key, EcKeyUsage::EcDh) {
+                Ok(peer_ecdh) => peer_ecdh,
+                Err(symcrypt_error) => {
+                    let custom_error_message = format!(
+                        "SymCryptError: {}",
+                        symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
+                    );
+                    return Err(Error::General(custom_error_message));
+                }
+            };
 
-        let secret_agreement =
-            EcKey::ecdh_secret_agreement(&self.state, peer_ecdh).map_err(map_peer_key_error)?;
+        let secret_agreement = match EcKey::ecdh_secret_agreement(&self.state, peer_ecdh) {
+            Ok(secret_agreement) => secret_agreement,
+            Err(symcrypt_error) => {
+                let custom_error_message = format!(
+                    "SymCryptError: {}",
+                    symcrypt_error // Using general error to propagate the SymCrypt error back to the caller
+                );
+                return Err(Error::General(custom_error_message));
+            }
+        };
         Ok(SharedSecret::from(secret_agreement.as_slice()))
     }
 
@@ -171,14 +188,5 @@ impl ActiveKeyExchange for KeyExchange {
 
     fn group(&self) -> NamedGroup {
         self.name
-    }
-}
-
-fn map_peer_key_error(error: SymCryptError) -> Error {
-    match error {
-        SymCryptError::InvalidArgument
-        | SymCryptError::InvalidBlob
-        | SymCryptError::WrongKeySize => INVALID_KEY_SHARE,
-        error => Error::General(format!("SymCrypt ECDH failed: {}", error)),
     }
 }

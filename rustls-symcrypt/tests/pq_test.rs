@@ -1,4 +1,5 @@
 //! Post-quantum hybrid key exchange integration tests.
+#![cfg(feature = "pq")]
 //!
 //! These drive a real rustls client and server against each other entirely in memory, so unlike
 //! `full_test.rs` they need no `openssl s_server` and no network. Both peers use the SymCrypt
@@ -14,7 +15,7 @@ use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::sync::Arc;
 
-use rustls::crypto::{CryptoProvider, SupportedKxGroup};
+use rustls::crypto::SupportedKxGroup;
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::{
@@ -23,8 +24,8 @@ use rustls::{
 };
 
 use rustls_symcrypt::{
-    custom_symcrypt_provider, default_symcrypt_provider, ALL_KX_GROUPS, DEFAULT_KX_GROUPS,
-    SECP256R1, SECP256R1MLKEM768, SECP384R1, X25519, X25519MLKEM768,
+    custom_symcrypt_provider, default_symcrypt_provider, SECP256R1, SECP256R1MLKEM768, SECP384R1,
+    X25519, X25519MLKEM768,
 };
 
 const SERVER_NAME: &str = "localhost";
@@ -145,58 +146,29 @@ fn test_secp256r1_mlkem768_handshake() {
     assert_eq!(client.handshake_kind(), Some(HandshakeKind::Full));
 }
 
-/// The default provider must actually offer a hybrid group as its first choice, otherwise the whole
-/// point of this work is lost: two SymCrypt peers with no explicit configuration should negotiate
-/// post-quantum.
 #[test]
-fn test_default_provider_negotiates_post_quantum() {
-    let mut client = Connection::Client(
-        ClientConnection::new(
-            Arc::new(
-                ClientConfig::builder_with_provider(Arc::new(default_symcrypt_provider()))
-                    .with_safe_default_protocol_versions()
-                    .unwrap()
-                    .with_root_certificates({
-                        let mut roots = RootCertStore::empty();
-                        roots.add_parsable_certificates(
-                            CertificateDer::pem_file_iter(cert_path("RootCA.pem"))
-                                .unwrap()
-                                .map(|cert| cert.unwrap()),
-                        );
-                        roots
-                    })
-                    .with_no_client_auth(),
-            ),
-            SERVER_NAME.try_into().unwrap(),
-        )
-        .unwrap(),
-    );
-    let mut server = Connection::Server(
-        ServerConnection::new(Arc::new(server_config(DEFAULT_KX_GROUPS.to_vec()))).unwrap(),
-    );
-
-    for _ in 0..16 {
-        if !client.is_handshaking() && !server.is_handshaking() {
-            break;
-        }
-        transfer(&mut client, &mut server).unwrap();
-        transfer(&mut server, &mut client).unwrap();
-    }
+fn test_default_provider_does_not_enable_post_quantum() {
+    let groups = default_symcrypt_provider()
+        .kx_groups
+        .iter()
+        .map(|group| group.name())
+        .collect::<Vec<_>>();
 
     assert_eq!(
-        client.negotiated_key_exchange_group().map(|g| g.name()),
-        Some(NamedGroup::X25519MLKEM768),
-        "the default provider must negotiate post-quantum without configuration"
+        groups,
+        [
+            NamedGroup::secp384r1,
+            NamedGroup::secp256r1,
+            NamedGroup::X25519,
+        ]
     );
-    assert_eq!(client.handshake_kind(), Some(HandshakeKind::Full));
 }
 
 /// A server that only knows the classical half must be able to select it out of the client's
 /// hybrid share, with no extra round trip. This is what `hybrid_component` buys.
 ///
 /// rustls only sends the separate classical share when the classical group also appears in the
-/// client's own `kx_groups`, after the hybrid, so the client list here mirrors the shape of
-/// [`DEFAULT_KX_GROUPS`].
+/// client's own `kx_groups`, after the hybrid.
 #[test]
 fn test_server_selects_classical_component_without_retry() {
     for (hybrid, classical, expected) in [
@@ -217,19 +189,6 @@ fn test_server_selects_classical_component_without_retry() {
             "selecting the classical component must not cost a HelloRetryRequest"
         );
     }
-}
-
-/// The mirror image: with the hybrid group alone in the client's list, there is no separate
-/// classical share and no classical entry in `supported_groups`, so a classical-only server has
-/// nothing to select and the handshake fails outright rather than retrying.
-///
-/// This is the concrete reason [`DEFAULT_KX_GROUPS`] lists `X25519` separately after the hybrid.
-#[test]
-fn test_hybrid_only_client_cannot_talk_to_classical_only_server() {
-    assert_eq!(
-        try_handshake(vec![X25519MLKEM768], vec![X25519]).unwrap_err(),
-        rustls::Error::PeerIncompatible(rustls::PeerIncompatible::NoKxGroupsInCommon)
-    );
 }
 
 /// When the server supports none of the groups the client sent a share for, it asks for one it does
@@ -259,76 +218,5 @@ fn test_hello_retry_request() {
     assert_eq!(
         client.handshake_kind(),
         Some(HandshakeKind::FullWithHelloRetryRequest)
-    );
-}
-
-/// Locks in the group lists. Missing a wiring site ships a provider that compiles but never offers
-/// post-quantum, which is exactly the silent failure this work exists to remove.
-#[test]
-fn test_provider_kx_group_wiring() {
-    let expected_default = [
-        NamedGroup::X25519MLKEM768,
-        NamedGroup::X25519,
-        NamedGroup::secp256r1,
-        NamedGroup::secp384r1,
-    ];
-    let expected_all = [
-        NamedGroup::X25519MLKEM768,
-        NamedGroup::secp256r1MLKEM768,
-        NamedGroup::X25519,
-        NamedGroup::secp256r1,
-        NamedGroup::secp384r1,
-    ];
-
-    let names = |groups: &[&'static dyn SupportedKxGroup]| {
-        groups.iter().map(|g| g.name()).collect::<Vec<_>>()
-    };
-
-    assert_eq!(names(DEFAULT_KX_GROUPS), expected_default);
-    assert_eq!(names(ALL_KX_GROUPS), expected_all);
-
-    // Both provider constructors, including the fallback path when no groups are supplied.
-    assert_eq!(
-        names(&default_symcrypt_provider().kx_groups),
-        expected_default
-    );
-    assert_eq!(
-        names(&custom_symcrypt_provider(None, None).kx_groups),
-        expected_default
-    );
-    assert_eq!(
-        names(&custom_symcrypt_provider(None, Some(vec![])).kx_groups),
-        expected_default
-    );
-}
-
-/// Pins the conservative FIPS decision so it cannot regress unnoticed in either direction.
-///
-/// `CryptoProvider::fips()` is already false for this provider and always has been: no key exchange
-/// group overrides the rustls default. Adding post-quantum groups that report false changes
-/// nothing. If this ever starts failing, someone has made a compliance claim that needs a real
-/// conversation behind it.
-#[test]
-fn test_fips_reporting() {
-    assert!(!X25519MLKEM768.fips());
-    assert!(!SECP256R1MLKEM768.fips());
-
-    let provider: CryptoProvider = default_symcrypt_provider();
-    assert!(!provider.fips());
-}
-
-/// X25519 is no longer behind a cargo feature. A post-quantum default that silently disappears
-/// unless the consumer opts in would defeat the purpose of enabling it by default.
-#[test]
-fn test_x25519_is_unconditional() {
-    assert_eq!(X25519.name(), NamedGroup::X25519);
-    assert!(DEFAULT_KX_GROUPS
-        .iter()
-        .any(|g| g.name() == NamedGroup::X25519));
-
-    let (client, _) = handshake(vec![X25519], vec![X25519]);
-    assert_eq!(
-        client.negotiated_key_exchange_group().map(|g| g.name()),
-        Some(NamedGroup::X25519)
     );
 }

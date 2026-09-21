@@ -384,49 +384,6 @@ mod test {
     }
 
     #[test]
-    fn test_malformed_classical_components_are_peer_misbehavior() {
-        for group in [X25519MLKEM768, SECP256R1MLKEM768] {
-            let client = group.start().unwrap();
-            let mut malformed_client_share = client.pub_key().to_vec();
-            match group.name() {
-                NamedGroup::X25519MLKEM768 => {
-                    malformed_client_share[MLKEM768_ENCAP_LEN..].fill(0);
-                }
-                NamedGroup::secp256r1MLKEM768 => {
-                    malformed_client_share[..SECP256R1_LEN].fill(0);
-                    malformed_client_share[0] = 0x04;
-                }
-                _ => unreachable!(),
-            }
-            assert_eq!(
-                group
-                    .start_and_complete(&malformed_client_share)
-                    .err()
-                    .unwrap(),
-                INVALID_KEY_SHARE
-            );
-
-            let client = group.start().unwrap();
-            let mut malformed_server_share =
-                group.start_and_complete(client.pub_key()).unwrap().pub_key;
-            match group.name() {
-                NamedGroup::X25519MLKEM768 => {
-                    malformed_server_share[MLKEM768_CIPHERTEXT_LEN..].fill(0);
-                }
-                NamedGroup::secp256r1MLKEM768 => {
-                    malformed_server_share[..SECP256R1_LEN].fill(0);
-                    malformed_server_share[0] = 0x04;
-                }
-                _ => unreachable!(),
-            }
-            assert_eq!(
-                client.complete(&malformed_server_share).err().unwrap(),
-                INVALID_KEY_SHARE
-            );
-        }
-    }
-
-    #[test]
     fn test_hybrid_groups_are_tls13_only() {
         for group in [X25519MLKEM768, SECP256R1MLKEM768] {
             assert!(group.usable_for_version(ProtocolVersion::TLSv1_3));

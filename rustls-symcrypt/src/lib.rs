@@ -1,7 +1,9 @@
 #![doc = include_str!("../README.md")]
 use rustls::crypto::{CryptoProvider, GetRandomFailed, SecureRandom, SupportedKxGroup};
 
-use rustls::{Error, PeerMisbehaved, SupportedCipherSuite};
+use rustls::SupportedCipherSuite;
+#[cfg(feature = "pq")]
+use rustls::{Error, PeerMisbehaved};
 use std::sync::{Arc, OnceLock};
 use symcrypt::symcrypt_random;
 
@@ -9,7 +11,9 @@ mod cipher_suites;
 mod ecdh;
 mod hash;
 mod hmac;
+#[cfg(feature = "pq")]
 mod hybrid;
+#[cfg(feature = "pq")]
 mod mlkem;
 mod signer;
 mod tls12;
@@ -17,6 +21,7 @@ mod tls13;
 mod verify;
 use crate::verify::SUPPORTED_SIG_ALGS;
 
+#[cfg(feature = "pq")]
 const INVALID_KEY_SHARE: Error = Error::PeerMisbehaved(PeerMisbehaved::InvalidKeyShare);
 
 /// Exporting default cipher suites for TLS 1.3
@@ -36,49 +41,18 @@ pub use cipher_suites::{
 };
 
 /// Exporting default key exchange groups
-pub use ecdh::{SECP256R1, SECP384R1, X25519};
+pub use ecdh::{SECP256R1, SECP384R1};
 
-/// Exporting hybrid post-quantum key exchange groups
+/// Exporting X25519 key exchange group
+#[cfg(feature = "x25519")]
+pub use ecdh::X25519;
+
+/// Exporting opt-in hybrid post-quantum key exchange groups.
+#[cfg(feature = "pq")]
 pub use hybrid::{SECP256R1MLKEM768, X25519MLKEM768};
-
-/// A list of the key exchange groups this provider offers by default, in preference order.
-///
-/// Post-quantum first, so the default `ClientHello` carries a hybrid share and a PQ-capable peer
-/// can negotiate it in one round trip.
-///
-/// This matches the aws-lc-rs `prefer-post-quantum` default set, deliberately: consumers swapping
-/// providers expect behavioral parity, and a differing default group list is exactly the kind of
-/// silent divergence that makes a crypto backend toggle untrustworthy.
-///
-/// `SECP256R1MLKEM768` is in [`ALL_KX_GROUPS`] but not here, also following upstream.
-/// ```ignore
-/// X25519MLKEM768
-/// X25519
-/// SECP256R1
-/// SECP384R1
-/// ```
-pub static DEFAULT_KX_GROUPS: &[&dyn SupportedKxGroup] =
-    &[X25519MLKEM768, X25519, ecdh::SECP256R1, ecdh::SECP384R1];
-
-/// A list of all the key exchange groups supported by this provider, in preference order.
-/// ```ignore
-/// X25519MLKEM768
-/// SECP256R1MLKEM768
-/// X25519
-/// SECP256R1
-/// SECP384R1
-/// ```
-pub static ALL_KX_GROUPS: &[&dyn SupportedKxGroup] = &[
-    X25519MLKEM768,
-    SECP256R1MLKEM768,
-    X25519,
-    ecdh::SECP256R1,
-    ecdh::SECP384R1,
-];
 
 /// `default_symcrypt_provider` returns a `CryptoProvider` using the default `SymCrypt` configuration and cipher suites.
 /// To see the default cipher suites, please take a look at [`DEFAULT_CIPHER_SUITES`].
-/// To see the default key exchange groups, please take a look at [`DEFAULT_KX_GROUPS`].
 ///
 /// Sample usage:
 /// ```rust
@@ -103,7 +77,7 @@ pub static ALL_KX_GROUPS: &[&dyn SupportedKxGroup] = &[
 pub fn default_symcrypt_provider() -> CryptoProvider {
     CryptoProvider {
         cipher_suites: DEFAULT_CIPHER_SUITES.to_vec(),
-        kx_groups: DEFAULT_KX_GROUPS.to_vec(),
+        kx_groups: ecdh::ALL_KX_GROUPS.to_vec(),
         signature_verification_algorithms: SUPPORTED_SIG_ALGS,
         secure_random: &SymCrypt,
         key_provider: &signer::SymCryptProvider,
@@ -194,7 +168,7 @@ pub fn custom_symcrypt_provider(
 
     let kx_group = match provided_kx_group {
         Some(groups) if !groups.is_empty() => groups, // Use provided non-empty groups
-        _ => DEFAULT_KX_GROUPS.to_vec(),              // Use default groups if None or empty
+        _ => ecdh::ALL_KX_GROUPS.to_vec(),            // Use default groups if None or empty
     };
 
     CryptoProvider {

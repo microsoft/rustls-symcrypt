@@ -9,7 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  FEATURES_TO_TEST: chacha, x25519
+  FEATURES_TO_TEST: chacha,pq
 
 jobs:
   build:

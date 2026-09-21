@@ -25,10 +25,8 @@ der = "0.8.0"
 
 [features]
 default = []
-# Deprecated no-op. X25519 is now always available, since a post-quantum default that silently
-# disappears unless the consumer opts into a feature defeats the point of enabling it by default.
-# Kept declared for one release so downstream manifests naming it still resolve.
 x25519 = []
+pq = ["x25519"]
 chacha = []
 
 [dev-dependencies]
