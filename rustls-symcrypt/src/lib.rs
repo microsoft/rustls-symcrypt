@@ -2,6 +2,8 @@
 use rustls::crypto::{CryptoProvider, GetRandomFailed, SecureRandom, SupportedKxGroup};
 
 use rustls::SupportedCipherSuite;
+#[cfg(feature = "pq")]
+use rustls::{Error, PeerMisbehaved};
 use std::sync::{Arc, OnceLock};
 use symcrypt::symcrypt_random;
 
@@ -9,11 +11,18 @@ mod cipher_suites;
 mod ecdh;
 mod hash;
 mod hmac;
+#[cfg(feature = "pq")]
+mod hybrid;
+#[cfg(feature = "pq")]
+mod mlkem;
 mod signer;
 mod tls12;
 mod tls13;
 mod verify;
 use crate::verify::SUPPORTED_SIG_ALGS;
+
+#[cfg(feature = "pq")]
+const INVALID_KEY_SHARE: Error = Error::PeerMisbehaved(PeerMisbehaved::InvalidKeyShare);
 
 /// Exporting default cipher suites for TLS 1.3
 pub use cipher_suites::{TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384};
@@ -37,6 +46,10 @@ pub use ecdh::{SECP256R1, SECP384R1};
 /// Exporting X25519 key exchange group
 #[cfg(feature = "x25519")]
 pub use ecdh::X25519;
+
+/// Exporting opt-in hybrid post-quantum key exchange groups.
+#[cfg(feature = "pq")]
+pub use hybrid::{SECP256R1MLKEM768, X25519MLKEM768};
 
 /// `default_symcrypt_provider` returns a `CryptoProvider` using the default `SymCrypt` configuration and cipher suites.
 /// To see the default cipher suites, please take a look at [`DEFAULT_CIPHER_SUITES`].

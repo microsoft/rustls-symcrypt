@@ -20,14 +20,16 @@ Refer to the [rust-symcrypt Quick Start Guide](https://github.com/microsoft/rust
 ## Usage
 
 Add `rustls-symcrypt` to your `Cargo.toml`:
-**Note:** If you wish to enable `x25519` or `chacha` you may add it as a feature at this time.
+**Note:** Optional cipher suites and key exchanges are enabled through Cargo features.
 
 ```toml
 [dependencies]
 rustls = { version = "0.23.0", features = ["tls12", "std", "custom-provider"], default-features = false }
-rustls_symcrypt = "0.2.2"
+rustls_symcrypt = "0.3.0"
 # To enable the chacha feature:
-# rustls_symcrypt = {version = "0.2.2", features = ["chacha"]}
+# rustls_symcrypt = {version = "0.3.0", features = ["chacha"]}
+# To enable the post-quantum hybrid groups:
+# rustls_symcrypt = {version = "0.3.0", features = ["pq"]}
 ```
 
 ## Supported Ciphers
@@ -57,7 +59,7 @@ TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 // Enabled with the `chacha` feature
 
 ## Supported Key Exchanges
 
-Key exchanges are listed below, ordered by preference. IE: `SECP384R1` is preferred over `SECP256R1`.
+Default key exchanges are listed below in preference order.
 
 ```ignore
 SECP384R1
@@ -65,7 +67,29 @@ SECP256R1
 X25519 // Enabled with the `x25519` feature
 ```
 
-**Note:** `X25519` is disabled by default. To enable, add `x25519` feature in your `Cargo.toml`.
+**Note:** `X25519` is disabled by default. Enable the `x25519` feature to use it.
+
+### Post-quantum key exchange
+
+The opt-in `pq` feature enables `X25519MLKEM768` and `SECP256R1MLKEM768`. It also enables the
+existing `x25519` feature required by `X25519MLKEM768`. Neither hybrid group is added to the default
+provider configuration.
+
+Select a hybrid group explicitly with `custom_symcrypt_provider()`. Keep the classical groups in
+the list so peers that do not support post-quantum key exchange can still negotiate:
+
+```rust,ignore
+use rustls_symcrypt::{
+    custom_symcrypt_provider, SECP256R1, SECP384R1, X25519, X25519MLKEM768,
+};
+
+let provider = custom_symcrypt_provider(
+    None,
+    Some(vec![X25519MLKEM768, SECP384R1, SECP256R1, X25519]),
+);
+```
+
+Both hybrid groups are TLS 1.3 only and report `false` from `SupportedKxGroup::fips()`.
 
 ## Example Code
 
