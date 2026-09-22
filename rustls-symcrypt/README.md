@@ -70,12 +70,18 @@ The opt-in `pq` feature enables `X25519MLKEM768` and `SECP256R1MLKEM768`. It als
 existing `x25519` feature required by `X25519MLKEM768`. Neither hybrid group is added to the default
 provider configuration.
 
-Select a hybrid group explicitly with `custom_symcrypt_provider()`:
+Select a hybrid group explicitly with `custom_symcrypt_provider()`. Keep the classical groups in
+the list so peers that do not support post-quantum key exchange can still negotiate:
 
 ```rust,ignore
-use rustls_symcrypt::{custom_symcrypt_provider, X25519MLKEM768};
+use rustls_symcrypt::{
+    custom_symcrypt_provider, SECP256R1, SECP384R1, X25519, X25519MLKEM768,
+};
 
-let provider = custom_symcrypt_provider(None, Some(vec![X25519MLKEM768]));
+let provider = custom_symcrypt_provider(
+    None,
+    Some(vec![X25519MLKEM768, SECP384R1, SECP256R1, X25519]),
+);
 ```
 
 Both hybrid groups are TLS 1.3 only and report `false` from `SupportedKxGroup::fips()`.

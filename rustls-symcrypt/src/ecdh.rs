@@ -4,6 +4,8 @@ use rustls::{Error, NamedGroup};
 
 use symcrypt::ecc::{CurveType, EcKey, EcKeyUsage};
 
+const X25519_PUBLIC_KEY_LEN: usize = 32;
+
 /// KxGroup is a struct that easily ties `rustls::NamedGroup` to the `symcrypt_sys::ecurve::CurveType`.
 ///
 /// This outlines the supported key exchange groups that are exposed by Rustls and implemented by SymCrypt.
@@ -125,6 +127,7 @@ impl SupportedKxGroup for KxGroup {
 /// `group()` will return the [`NamedGroup`] of the [`KeyExchange`]
 impl ActiveKeyExchange for KeyExchange {
     fn complete(self: Box<Self>, peer_pub_key: &[u8]) -> Result<SharedSecret, Error> {
+        let mut normalized_x25519_key = [0u8; X25519_PUBLIC_KEY_LEN];
         let new_peer_pub_key = match self.curve_type {
             CurveType::NistP256 | CurveType::NistP384 => {
                 // If curve type is NistP256 or NistP384 or NistP521 remove the first byte
@@ -146,8 +149,7 @@ impl ActiveKeyExchange for KeyExchange {
             }
 
             CurveType::Curve25519 => {
-                // Do not remove first byte for Curve22519, since Curve25519 only has the x and y coordinates.
-                peer_pub_key
+                normalize_x25519_peer_key(peer_pub_key, &mut normalized_x25519_key)
             }
 
             CurveType::NistP521 => {
@@ -188,5 +190,63 @@ impl ActiveKeyExchange for KeyExchange {
 
     fn group(&self) -> NamedGroup {
         self.name
+    }
+}
+
+fn normalize_x25519_peer_key<'a>(
+    peer_pub_key: &'a [u8],
+    normalized: &'a mut [u8; X25519_PUBLIC_KEY_LEN],
+) -> &'a [u8] {
+    if peer_pub_key.len() != X25519_PUBLIC_KEY_LEN {
+        return peer_pub_key;
+    }
+
+    normalized.copy_from_slice(peer_pub_key);
+
+    // RFC 7748 section 5 requires masking bit 255 and accepting the 19 noncanonical field
+    // encodings by reducing them modulo 2^255 - 19 before passing them to SymCrypt.
+    normalized[31] &= 0x7f;
+    if normalized[31] == 0x7f
+        && normalized[1..31].iter().all(|byte| *byte == 0xff)
+        && normalized[0] >= 0xed
+    {
+        normalized[0] -= 0xed;
+        normalized[1..].fill(0);
+    }
+
+    normalized
+}
+
+#[cfg(all(test, feature = "x25519"))]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_x25519_masks_high_bit() {
+        let client = X25519.start().unwrap();
+        let client_pub_key = client.pub_key().to_vec();
+        let server = X25519.start().unwrap();
+        let mut server_pub_key = server.pub_key().to_vec();
+        server_pub_key[31] |= 0x80;
+
+        let client_secret = client.complete(&server_pub_key).unwrap();
+        let server_secret = server.complete(&client_pub_key).unwrap();
+
+        assert_eq!(client_secret.secret_bytes(), server_secret.secret_bytes());
+    }
+
+    #[test]
+    fn test_x25519_reduces_noncanonical_coordinates() {
+        let mut scratch = [0u8; X25519_PUBLIC_KEY_LEN];
+
+        for (low_byte, expected) in [(0xed, 0), (0xf6, 9), (0xff, 18)] {
+            let mut noncanonical = [0xff; X25519_PUBLIC_KEY_LEN];
+            noncanonical[0] = low_byte;
+            noncanonical[31] = 0x7f;
+
+            let normalized = normalize_x25519_peer_key(&noncanonical, &mut scratch);
+            assert_eq!(normalized[0], expected);
+            assert!(normalized[1..].iter().all(|byte| *byte == 0));
+        }
     }
 }

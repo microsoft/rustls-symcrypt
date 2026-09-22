@@ -65,6 +65,14 @@ jobs:
     - name: Release build
       run: cargo build --workspace --exclude examples --release --locked --verbose --target ${{ matrix.target }}
 
+    - name: Test default feature set
+      if: matrix.run-tests
+      run: cargo test -p rustls-symcrypt --no-default-features --locked --target ${{ matrix.target }} --lib
+
+    - name: Test X25519 feature set
+      if: matrix.run-tests
+      run: cargo test -p rustls-symcrypt --no-default-features --features x25519 --locked --target ${{ matrix.target }} --lib
+
     # TODO: re-enable when static linking is ready.
     # - name: Run tests (Debug, dynamic)
     #   if: matrix.run-tests
@@ -74,12 +82,10 @@ jobs:
     #   if: matrix.run-tests
     #   run: cargo test --workspace --exclude examples --release --locked --verbose --all-features --target ${{ matrix.target }}
 
-    # Disabling examples for testing 
-
-    - name: Run test (Debug, static)
+    - name: Run deterministic tests (Debug, static)
       if: matrix.run-tests
-      run: cargo test -p rustls-symcrypt --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --lib --tests
+      run: cargo test -p rustls-symcrypt --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --lib --test pq_test
 
-    - name: Run test (Release, static)
+    - name: Run deterministic tests (Release, static)
       if: matrix.run-tests
-      run: cargo test -p rustls-symcrypt --release --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --lib --tests
+      run: cargo test -p rustls-symcrypt --release --features ${{ env.FEATURES_TO_TEST }} --locked --target ${{ matrix.target }} --lib --test pq_test

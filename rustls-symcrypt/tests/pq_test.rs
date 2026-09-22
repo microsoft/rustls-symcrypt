@@ -210,13 +210,15 @@ fn test_hello_retry_request() {
     );
 
     // The reverse direction: a hybrid-only server retries a classical-first client's share.
-    let (client, _) = handshake(vec![SECP384R1, X25519MLKEM768], vec![X25519MLKEM768]);
-    assert_eq!(
-        client.negotiated_key_exchange_group().map(|g| g.name()),
-        Some(NamedGroup::X25519MLKEM768)
-    );
-    assert_eq!(
-        client.handshake_kind(),
-        Some(HandshakeKind::FullWithHelloRetryRequest)
-    );
+    let (client, server) = handshake(vec![SECP384R1, X25519MLKEM768], vec![X25519MLKEM768]);
+    for conn in [&client, &server] {
+        assert_eq!(
+            conn.negotiated_key_exchange_group().map(|g| g.name()),
+            Some(NamedGroup::X25519MLKEM768)
+        );
+        assert_eq!(
+            conn.handshake_kind(),
+            Some(HandshakeKind::FullWithHelloRetryRequest)
+        );
+    }
 }
